@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ASCII 3D Raycaster Engine</title>
+  <style>
+    :root {
+      --term-green: #33ff66;
+      --term-green-glow: rgba(51, 255, 102, 0.45);
+      --term-amber: #ffb000;
+      --term-amber-glow: rgba(255, 176, 0, 0.45);
+      --term-cyan: #00f3ff;
+      --term-cyan-glow: rgba(0, 243, 255, 0.45);
+      --term-white: #e0e6ed;
+      --term-white-glow: rgba(224, 230, 237, 0.35);
+
+      --active-color: var(--term-green);
+      --active-glow: var(--term-green-glow);
+      --bg-color: #050a06;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--active-color);
+      font-family: 'Courier New', Courier, monospace, monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Subtle CRT Scanline overlay */
+    .scanlines {
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.4) 50%
+      ), linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.03),
+        rgba(0, 255, 0, 0.01),
+        rgba(0, 0, 255, 0.03)
+      );
+      background-size: 100% 3px, 6px 100%;
+      z-index: 20;
+    }
+
+    /* Curved CRT screen vignette */
+    .vignette {
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.85);
+      z-index: 21;
+    }
+
+    /* Container for monospace display */
+    #terminal-container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    #ascii-screen {
+      display: block;
+      font-family: 'Courier New', 'Consolas', 'Courier', monospace;
+      font-weight: 700;
+      line-height: 1.0;
+      letter-spacing: 0.05em;
+      white-space: pre;
+      color: var(--active-color);
+      text-shadow: 0 0 6px var(--active-glow);
+      transform-origin: center center;
+    }
+
+    /* Floating control bar at bottom */
+    #ui-toolbar {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      z-index: 30;
+      background: rgba(0, 15, 5, 0.75);
+      border: 1px solid var(--active-color);
+      padding: 6px 14px;
+      border-radius: 6px;
+      box-shadow: 0 0 10px var(--active-glow);
+      backdrop-filter: blur(4px);
+    }
+
+    button.t-btn {
+      background: transparent;
+      border: 1px solid var(--active-color);
+      color: var(--active-color);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      text-shadow: 0 0 3px var(--active-glow);
+    }
+
+    button.t-btn:hover, button.t-btn:active {
+      background: var(--active-color);
+      color: #000;
+      box-shadow: 0 0 8px var(--active-color);
+    }
+
+    /* Touch Controls Overlay for Mobile */
+    #touch-controls {
+      display: none;
+      position: absolute;
+      bottom: 60px;
+      left: 0;
+      width: 100%;
+      height: 130px;
+      pointer-events: none;
+      z-index: 25;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+
+    .touch-pad {
+      pointer-events: auto;
+      display: grid;
+      gap: 6px;
+    }
+
+    .dpad {
+      grid-template-columns: repeat(3, 44px);
+      grid-template-rows: repeat(2, 44px);
+    }
+
+    .t-pad-btn {
+      background: rgba(0, 20, 10, 0.6);
+      border: 1px solid var(--active-color);
+      color: var(--active-color);
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .t-pad-btn:active {
+      background: var(--active-color);
+      color: #000;
+    }
+
+    @media (pointer: coarse) {
+      #touch-controls {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+
+  <div id="terminal-container">
+    <pre id="ascii-screen"></pre>
+  </div>
+
+  <div id="touch-controls">
+    <div class="touch-pad dpad">
+      <div></div>
+      <button class="t-pad-btn" id="btn-up">▲</button>
+      <div></div>
+      <button class="t-pad-btn" id="btn-left">◀</button>
+      <button class="t-pad-btn" id="btn-down">▼</button>
+      <button class="t-pad-btn" id="btn-right">▶</button>
+    </div>
+    <div class="touch-pad" style="grid-template-columns: 50px 50px; grid-template-rows: 50px; align-self: flex-end; margin-bottom: 8px;">
+      <button class="t-pad-btn" id="btn-rot-left">↺</button>
+      <button class="t-pad-btn" id="btn-rot-right">↻</button>
+    </div>
+  </div>
+
+  <div id="ui-toolbar">
+    <button class="t-btn" id="btn-theme">PALETTE: GREEN</button>
+    <button class="t-btn" id="btn-map">TOGGLE MAP</button>
+    <button class="t-btn" id="btn-res">RES: HIGH</button>
+    <button class="t-btn" id="btn-help">HELP</button>
+  </div>
+
+  <script>
+    // Map dimensions
+    const MAP_W = 24;
+    const MAP_H = 24;
+
+    // 0 = open air, 1 = solid barrier, 2 = stone pillar/brick, 3 = high-tech obelisk, 4 = lattice grid
+    const MAP = [
+      1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+      1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,
+      1,0,2,2,0,0,1,0,3,3,3,0,0,0,0,0,1,0,4,4,4,0,0,1,
+      1,0,2,0,0,0,1,0,3,0,3,0,0,0,0,0,1,0,4,0,4,0,0,1,
+      1,0,0,0,0,0,0,0,3,3,3,0,0,2,2,0,0,0,4,4,4,0,0,1,
+      1,0,0,0,0,0,1,0,0,0,0,0,0,2,2,0,1,0,0,0,0,0,0,1,
+      1,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,
+      1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,
+      1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,
+      1,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,1,
+      1,0,2,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,3,0,0,1,
+      1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,
+      1,1,0,1,1,0,0,2,2,2,0,0,1,1,0,1,1,0,1,1,0,1,1,1,
+      1,0,0,0,0,0,0,2,0,2,0,0,0,0,0,0,1,0,0,0,0,0,0,1,
+      1,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,1,0,0,0,0,0,0,1,
+      1,0,4,4,4,0,0,0,0,0,0,0,4,4,0,0,0,0,2,2,2,0,0,1,
+      1,0,4,0,4,0,0,0,0,0,0,0,4,4,0,0,0,0,2,0,2,0,0,1,
+      1,0,4,4,4,0,0,0,0,0,0,0,0,0,0,0,1,0,2,2,2,0,0,1,
+      1,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,1,
+      1,0,0,0,0,0,1,0,0,0,1,0,3,3,3,0,1,0,0,0,0,0,0,1,
+      1,0,3,3,0,0,1,0,0,0,1,0,3,0,3,0,1,0,0,4,4,0,0,1,
+      1,0,3,3,0,0,1,0,0,0,1,0,3,3,3,0,1,0,0,4,4,0,0,1,
+      1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+      1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    ];
+
+    const player = {
+      x: 3.5,
+      y: 3.5,
+      dirX: 1.0,
+      dirY: 0.0,
+      planeX: 0.0,
+      planeY: 0.66, // 66 deg FOV
+      moveSpeed: 3.8,
+      rotSpeed: 2.6
+    };
+
+    // Floating 3D dynamic objects in continuous space
+    const entities = [
+      { x: 9.5, y: 3.5, char: '◆', name: 'CYBER PRISM', rot: 0 },
+      { x: 14.5, y: 14.5, char: '▲', name: 'CORE PYRAMID', rot: 0 },
+      { x: 4.5, y: 16.5, char: '✦', name: 'NEON RELIC', rot: 0 },
+      { x: 20.5, y: 9.5, char: '⬢', name: 'QUANTUM CELL', rot: 0 },
+      { x: 13.5, y: 20.5, char: '★', name: 'DATA BEACON', rot: 0 }
+    ];
+
+    let SCREEN_W = 100;
+    let SCREEN_H = 40;
+    let highResMode = true;
+    let showMiniMap = true;
+    let showHelpModal = false;
+
+    // Luminance ramps from deep shadow to bright illumination
+    const SHADES_WALL_N =  " .:-=+*#%@";
+    const SHADES_WALL_S =  " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+    const SHADE_RAMP =     "   .,-~:;=!*#$@";
+    const SHADE_RAMP_LEN = SHADE_RAMP.length;
+
+    // Floor and ceiling texture characters
+    const CEIL_CHARS = [" ", " ", " ", "`", "·", "'"];
+    const FLOOR_CHARS = [" ", ".", ",", "-", "~", "=", "+", "#"];
+
+    // Terminal DOM handles
+    const screenPre = document.getElementById('ascii-screen');
+    const container = document.getElementById('terminal-container');
+
+    const themes = [
+      { name: 'GREEN', color: '#33ff66', glow: 'rgba(51, 255, 102, 0.45)', bg: '#050c07' },
+      { name: 'AMBER', color: '#ffb000', glow: 'rgba(255, 176, 0, 0.45)', bg: '#0d0902' },
+      { name: 'CYAN',  color: '#00f3ff', glow: 'rgba(0, 243, 255, 0.45)', bg: '#020b0e' },
+      { name: 'MONO',  color: '#e0e6ed', glow: 'rgba(224, 230, 237, 0.35)', bg: '#08080a' }
+    ];
+    let activeThemeIndex = 0;
+
+    function applyTheme(idx) {
+      const t = themes[idx];
+      document.documentElement.style.setProperty('--active-color', t.color);
+      document.documentElement.style.setProperty('--active-glow', t.glow);
+      document.documentElement.style.setProperty('--bg-color', t.bg);
+      document.getElementById('btn-theme').textContent = `PALETTE: ${t.name}`;
+    }
+
+    function adjustScreenResolution() {
+      const aspect = 2.1; // Typical monospace glyph aspect ratio (height / width ≈ 2)
+      const winW = window.innerWidth;
+      const winH = window.innerHeight;
+
+      if (highResMode) {
+        SCREEN_W = winW < 600 ? 76 : (winW < 1000 ? 104 : 132);
+        SCREEN_H = winW < 600 ? 34 : (winW < 1000 ? 42 : 52);
+      } else {
+        SCREEN_W = winW < 600 ? 56 : (winW < 1000 ? 74 : 90);
+        SCREEN_H = winW < 600 ? 26 : (winW < 1000 ? 32 : 38);
+      }
+
+      // Compute font size to guarantee viewport fit
+      const charWidthPx = winW / (SCREEN_W + 1);
+      const charHeightPx = winH / (SCREEN_H + 2);
+      const computedFontSize = Math.max(7, Math.min(18, Math.floor(Math.min(charWidthPx * 1.6, charHeightPx))));
+      screenPre.style.fontSize = `${computedFontSize}px`;
+    }
+
+    window.addEventListener('resize', adjustScreenResolution);
+
+    const keys = {
+      forward: false,
+      backward: false,
+      rotLeft: false,
+      rotRight: false,
+      strafeLeft: false,
+      strafeRight: false
+    };
+
+    window.addEventListener('keydown', (e) => {
+      const code = e.code;
+      if (code === 'KeyW' || code === 'ArrowUp') keys.forward = true;
+      if (code === 'KeyS' || code === 'ArrowDown') keys.backward = true;
+      if (code === 'KeyA') keys.strafeLeft = true;
+      if (code === 'KeyD') keys.strafeRight = true;
+      if (code === 'KeyQ' || code === 'ArrowLeft') keys.rotLeft = true;
+      if (code === 'KeyE' || code === 'ArrowRight') keys.rotRight = true;
+      if (code === 'KeyM') showMiniMap = !showMiniMap;
+      if (code === 'KeyH') showHelpModal = !showHelpModal;
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const code = e.code;
+      if (code === 'KeyW' || code === 'ArrowUp') keys.forward = false;
+      if (code === 'KeyS' || code === 'ArrowDown') keys.backward = false;
+      if (code === 'KeyA') keys.strafeLeft = false;
+      if (code === 'KeyD') keys.strafeRight = false;
+      if (code === 'KeyQ' || code === 'ArrowLeft') keys.rotLeft = false;
+      if (code === 'KeyE' || code === 'ArrowRight') keys.rotRight = false;
+    });
+
+    // Touch and mouse drag rotation
+    let isPointerDragging = false;
+    let lastPointerX = 0;
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#ui-toolbar') || e.target.closest('#touch-controls')) return;
+      isPointerDragging = true;
+      lastPointerX = e.clientX;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isPointerDragging) return;
+      const deltaX = e.clientX - lastPointerX;
+      lastPointerX = e.clientX;
+      const angle = deltaX * 0.006;
+      rotatePlayer(angle);
+    });
+
+    window.addEventListener('pointerup', () => { isPointerDragging = false; });
+    window.addEventListener('pointercancel', () => { isPointerDragging = false; });
+
+    // Wire onscreen touch buttons
+    function bindTouchBtn(id, pressFn, releaseFn) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressFn(); });
+      el.addEventListener('pointerup', (e) => { e.preventDefault(); releaseFn(); });
+      el.addEventListener('pointerleave', (e) => { e.preventDefault(); releaseFn(); });
+    }
+
+    bindTouchBtn('btn-up', () => { keys.forward = true; }, () => { keys.forward = false; });
+    bindTouchBtn('btn-down', () => { keys.backward = true; }, () => { keys.backward = false; });
+    bindTouchBtn('btn-left', () => { keys.strafeLeft = true; }, () => { keys.strafeLeft = false; });
+    bindTouchBtn('btn-right', () => { keys.strafeRight = true; }, () => { keys.strafeRight = false; });
+    bindTouchBtn('btn-rot-left', () => { keys.rotLeft = true; }, () => { keys.rotLeft = false; });
+    bindTouchBtn('btn-rot-right', () => { keys.rotRight = true; }, () => { keys.rotRight = false; });
+
+    document.getElementById('btn-theme').addEventListener('click', () => {
+      activeThemeIndex = (activeThemeIndex + 1) % themes.length;
+      applyTheme(activeThemeIndex);
+    });
+
+    document.getElementById('btn-map').addEventListener('click', () => {
+      showMiniMap = !showMiniMap;
+    });
+
+    document.getElementById('btn-res').addEventListener('click', (e) => {
+      highResMode = !highResMode;
+      e.target.textContent = highResMode ? "RES: HIGH" : "RES: RETRO";
+      adjustScreenResolution();
+    });
+
+    document.getElementById('btn-help').addEventListener('click', () => {
+      showHelpModal = !showHelpModal;
+    });
+
+    function rotatePlayer(angle) {
+      const oldDirX = player.dirX;
+      player.dirX = player.dirX * Math.cos(angle) - player.dirY * Math.sin(angle);
+      player.dirY = oldDirX * Math.sin(angle) + player.dirY * Math.cos(angle);
+
+      const oldPlaneX = player.planeX;
+      player.planeX = player.planeX * Math.cos(angle) - player.planeY * Math.sin(angle);
+      player.planeY = oldPlaneX * Math.sin(angle) + player.planeY * Math.cos(angle);
+    }
+
+    function movePlayer(dt) {
+      // Rotation
+      if (keys.rotLeft) rotatePlayer(-player.rotSpeed * dt);
+      if (keys.rotRight) rotatePlayer(player.rotSpeed * dt);
+
+      // Movement vector
+      let moveX = 0;
+      let moveY = 0;
+
+      if (keys.forward) {
+        moveX += player.dirX;
+        moveY += player.dirY;
+      }
+      if (keys.backward) {
+        moveX -= player.dirX;
+        moveY -= player.dirY;
+      }
+      if (keys.strafeLeft) {
+        moveX -= player.planeX;
+        moveY -= player.planeY;
+      }
+      if (keys.strafeRight) {
+        moveX += player.planeX;
+        moveY += player.planeY;
+      }
+
+      // Normalization
+      const len = Math.hypot(moveX, moveY);
+      if (len > 0.001) {
+        moveX = (moveX / len) * player.moveSpeed * dt;
+        moveY = (moveY / len) * player.moveSpeed * dt;
+
+        // Sliding collision with margin
+        const padX = moveX > 0 ? 0.25 : -0.25;
+        const padY = moveY > 0 ? 0.25 : -0.25;
+
+        const nextGridX = Math.floor(player.x + moveX + padX);
+        const currGridY = Math.floor(player.y);
+        if (MAP[currGridY * MAP_W + nextGridX] === 0) {
+          player.x += moveX;
+        }
+
+        const currGridX = Math.floor(player.x);
+        const nextGridY = Math.floor(player.y + moveY + padY);
+        if (MAP[nextGridY * MAP_W + currGridX] === 0) {
+          player.y += moveY;
+        }
+      }
+    }
+
+    let zBuffer = new Float32Array(256);
+
+    function renderRaycastFrame(buffer, w, h, time) {
+      if (zBuffer.length < w) {
+        zBuffer = new Float32Array(w);
+      }
+
+      // Pre-clear / fill ceiling and floor with perspective dithering
+      const halfH = Math.floor(h / 2);
+      for (let y = 0; y < h; y++) {
+        const isCeil = y < halfH;
+        // Projected floor distance approximation
+        const p = isCeil ? (halfH - y) : (y - halfH);
+        const distRatio = Math.max(1, p);
+        
+        for (let x = 0; x < w; x++) {
+          if (isCeil) {
+            // Ceiling starry lattice / pipes
+            if (p < 3) {
+              buffer[y][x] = '~';
+            } else if ((x * 7 + y * 13) % 29 === 0) {
+              buffer[y][x] = '·';
+            } else if ((x + y) % 37 === 0) {
+              buffer[y][x] = "'";
+            } else {
+              buffer[y][x] = ' ';
+            }
+          } else {
+            // Floor grid perspective dithering
+            const depthFactor = (halfH / distRatio);
+            if (depthFactor < 1.4) {
+              buffer[y][x] = (x % 2 === 0) ? '#' : '=';
+            } else if (depthFactor < 2.5) {
+              buffer[y][x] = ((x + y) % 2 === 0) ? '+' : '-';
+            } else if (depthFactor < 4.5) {
+              buffer[y][x] = ((x ^ y) % 4 === 0) ? '.' : ' ';
+            } else {
+              buffer[y][x] = ' ';
+            }
+          }
+        }
+      }
+
+      // Cast rays across screen columns
+      for (let x = 0; x < w; x++) {
+        // Camera space coordinate x: -1 to +1
+        const cameraX = (2 * x / w) - 1;
+        const rayDirX = player.dirX + player.planeX * cameraX;
+        const rayDirY = player.dirY + player.planeY * cameraX;
+
+        // Player current cell
+        let mapX = Math.floor(player.x);
+        let mapY = Math.floor(player.y);
+
+        // Length of ray from current position to next x or y-side
+        let sideDistX;
+        let sideDistY;
+
+        // Delta ray length from 1 cell step to next
+        const deltaDistX = Math.abs(1 / (rayDirX || 0.00001));
+        const deltaDistY = Math.abs(1 / (rayDirY || 0.00001));
+        let perpWallDist;
+
+        let stepX;
+        let stepY;
+        let hit = 0;
+        let side = 0; // 0 for vertical side, 1 for horizontal
+
+        if (rayDirX < 0) {
+          stepX = -1;
+          sideDistX = (player.x - mapX) * deltaDistX;
+        } else {
+          stepX = 1;
+          sideDistX = (mapX + 1.0 - player.x) * deltaDistX;
+        }
+
+        if (rayDirY < 0) {
+          stepY = -1;
+          sideDistY = (player.y - mapY) * deltaDistY;
+        } else {
+          stepY = 1;
+          sideDistY = (mapY + 1.0 - player.y) * deltaDistY;
+        }
+
+        // DDA algorithm loop
+        while (hit === 0) {
+          if (sideDistX < sideDistY) {
+            sideDistX += deltaDistX;
+            mapX += stepX;
+            side = 0;
+          } else {
+            sideDistY += deltaDistY;
+            mapY += stepY;
+            side = 1;
+          }
+
+          if (mapX >= 0 && mapX < MAP_W && mapY >= 0 && mapY < MAP_H) {
+            if (MAP[mapY * MAP_W + mapX] > 0) hit = 1;
+          } else {
+            hit = 1; // Out of bounds safety
+          }
+        }
+
+        // Distance projected along camera normal
+        if (side === 0) {
+          perpWallDist = (mapX - player.x + (1 - stepX) / 2) / rayDirX;
+        } else {
+          perpWallDist = (mapY - player.y + (1 - stepY) / 2) / rayDirY;
+        }
+        perpWallDist = Math.max(0.1, perpWallDist);
+        zBuffer[x] = perpWallDist;
+
+        // Calculate wall height in screen characters
+        const lineHeight = Math.floor(h / perpWallDist);
+        let drawStart = Math.floor(-lineHeight / 2 + h / 2);
+        let drawEnd = Math.floor(lineHeight / 2 + h / 2);
+
+        const clampedStart = Math.max(0, drawStart);
+        const clampedEnd = Math.min(h - 1, drawEnd);
+
+        // Determine wall texture/type
+        const cellType = MAP[mapY * MAP_W + mapX] || 1;
+        
+        // Exact wall hit point for vertical alignment texture
+        let wallX;
+        if (side === 0) wallX = player.y + perpWallDist * rayDirY;
+        else           wallX = player.x + perpWallDist * rayDirX;
+        wallX -= Math.floor(wallX);
+
+        // Lighting calculation based on distance and orientation
+        let light = Math.max(0, Math.min(1, 1.0 - (perpWallDist / 16.0)));
+        if (side === 1) light *= 0.72; // Shading for north/south faces
+
+        // Choose character ramp according to block theme
+        for (let y = clampedStart; y <= clampedEnd; y++) {
+          let charToDraw = ' ';
+
+          if (cellType === 4) {
+            // Lattice fence
+            const isBar = (Math.floor(wallX * 5) % 2 === 0) || (Math.floor((y - drawStart) / (lineHeight / 6)) % 2 === 0);
+            charToDraw = isBar ? (side === 0 ? '|' : '+') : '.';
+          } else if (cellType === 3) {
+            // High-tech monolith
+            const texCoord = Math.floor(((y - drawStart) / lineHeight) * 8);
+            if (texCoord === 2 || texCoord === 5) {
+              charToDraw = '=';
+            } else {
+              const rampIdx = Math.floor(light * (SHADE_RAMP_LEN - 1));
+              charToDraw = SHADE_RAMP[rampIdx];
+            }
+          } else if (cellType === 2) {
+            // Brick pillar
+            const rampIdx = Math.floor(light * (SHADE_RAMP_LEN - 1));
+            charToDraw = SHADE_RAMP[rampIdx];
+          } else {
+            // Perimeter walls
+            const ramp = side === 0 ? "#%*+=-:. " : "@$#*+=-. ";
+            const rampIdx = Math.min(ramp.length - 1, Math.floor((1.0 - light) * ramp.length));
+            charToDraw = ramp[rampIdx];
+          }
+
+          buffer[y][x] = charToDraw;
+        }
+      }
+    }
+
+    function renderSprites(buffer, w, h, time) {
+      // Sort entities far to near
+      const sorted = entities.map(e => {
+        const dx = e.x - player.x;
+        const dy = e.y - player.y;
+        return {
+          ...e,
+          dist: dx * dx + dy * dy
+        };
+      }).sort((a, b) => b.dist - a.dist);
+
+      for (const ent of sorted) {
+        // Translate entity relative to camera
+        const spriteX = ent.x - player.x;
+        const spriteY = ent.y - player.y;
+
+        // Transform with inverse camera matrix
+        const invDet = 1.0 / (player.planeX * player.dirY - player.dirX * player.planeY);
+        const transformX = invDet * (player.dirY * spriteX - player.dirX * spriteY);
+        const transformY = invDet * (-player.planeY * spriteX + player.planeX * spriteY); // depth in camera
+
+        if (transformY <= 0.2) continue; // Behind camera
+
+        const spriteScreenX = Math.floor((w / 2) * (1 + transformX / transformY));
+        
+        // Floating sine wave hover
+        const hoverOffset = Math.sin(time * 3 + ent.x) * 0.15;
+        const spriteHeight = Math.abs(Math.floor(h / (transformY)));
+        const spriteWidth = Math.abs(Math.floor(h / (transformY * 1.8)));
+
+        const drawStartY = Math.max(0, Math.floor(-spriteHeight / 2 + h / 2 + (hoverOffset * h / transformY)));
+        const drawEndY = Math.min(h - 1, Math.floor(spriteHeight / 2 + h / 2 + (hoverOffset * h / transformY)));
+
+        const drawStartX = Math.max(0, Math.floor(-spriteWidth / 2 + spriteScreenX));
+        const drawEndX = Math.min(w - 1, Math.floor(spriteWidth / 2 + spriteScreenX));
+
+        // Depth check against zBuffer
+        for (let stripe = drawStartX; stripe <= drawEndX; stripe++) {
+          if (transformY > 0 && stripe >= 0 && stripe < w && transformY < zBuffer[stripe]) {
+            // Draw 3D wireframe diamond/core
+            for (let y = drawStartY; y <= drawEndY; y++) {
+              const relY = (y - drawStartY) / (drawEndY - drawStartY);
+              const relX = (stripe - drawStartX) / (drawEndX - drawStartX);
+              const distFromCenter = Math.abs(relX - 0.5) + Math.abs(relY - 0.5);
+
+              if (distFromCenter < 0.45) {
+                if (distFromCenter < 0.18) {
+                  buffer[y][stripe] = ent.char;
+                } else if (distFromCenter < 0.32) {
+                  buffer[y][stripe] = 'o';
+                } else {
+                  buffer[y][stripe] = ':';
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function overlayHUD(buffer, w, h, fps) {
+      // 1. Compass direction
+      const angle = Math.atan2(player.dirY, player.dirX) * (180 / Math.PI);
+      const normalizedAngle = (angle + 360) % 360;
+      let heading = "E";
+      if (normalizedAngle >= 22.5 && normalizedAngle < 67.5) heading = "SE";
+      else if (normalizedAngle >= 67.5 && normalizedAngle < 112.5) heading = "S";
+      else if (normalizedAngle >= 112.5 && normalizedAngle < 157.5) heading = "SW";
+      else if (normalizedAngle >= 157.5 && normalizedAngle < 202.5) heading = "W";
+      else if (normalizedAngle >= 202.5 && normalizedAngle < 247.5) heading = "NW";
+      else if (normalizedAngle >= 247.5 && normalizedAngle < 292.5) heading = "N";
+      else if (normalizedAngle >= 292.5 && normalizedAngle < 337.5) heading = "NE";
+
+      const hudHeader = `[SYS: OK] POS:(${player.x.toFixed(1)}, ${player.y.toFixed(1)}) | DIR:${heading} (${Math.round(normalizedAngle)}°) | FPS:${fps}`;
+      
+      // Stamp top HUD
+      for (let i = 0; i < hudHeader.length && i < w - 2; i++) {
+        buffer[1][i + 2] = hudHeader[i];
+      }
+
+      // Top decorative border
+      for (let i = 2; i < w - 2; i++) {
+        buffer[0][i] = '═';
+        buffer[2][i] = '─';
+      }
+      buffer[0][1] = '╔';
+      buffer[0][w - 2] = '╗';
+
+      // 2. Minimap in Top Right Corner
+      if (showMiniMap && w > 65) {
+        const mapScale = 1;
+        const mmW = 12;
+        const mmH = 10;
+        const startX = w - mmW - 3;
+        const startY = 1;
+
+        // Minimap frame
+        for (let my = 0; my < mmH; my++) {
+          for (let mx = 0; mx < mmW; mx++) {
+            const worldX = Math.floor(player.x - (mmW / 2) + mx);
+            const worldY = Math.floor(player.y - (mmH / 2) + my);
+            
+            let mChar = ' ';
+            if (worldX === Math.floor(player.x) && worldY === Math.floor(player.y)) {
+              // Heading arrow for player
+              if (heading === "N") mChar = '▲';
+              else if (heading === "S") mChar = '▼';
+              else if (heading === "E") mChar = '▶';
+              else if (heading === "W") mChar = '◀';
+              else mChar = '◆';
+            } else if (worldX >= 0 && worldX < MAP_W && worldY >= 0 && worldY < MAP_H) {
+              const cell = MAP[worldY * MAP_W + worldX];
+              if (cell > 0) mChar = '█';
+              else {
+                // Check if any entity is here
+                const hasEntity = entities.some(e => Math.floor(e.x) === worldX && Math.floor(e.y) === worldY);
+                mChar = hasEntity ? '✦' : '·';
+              }
+            }
+            buffer[startY + my][startX + mx] = mChar;
+          }
+        }
+
+        // Draw border for minimap
+        for (let my = 0; my < mmH; my++) {
+          buffer[startY + my][startX - 1] = '│';
+          buffer[startY + my][startX + mmW] = '│';
+        }
+        for (let mx = -1; mx <= mmW; mx++) {
+          buffer[startY - 1][startX + mx] = '─';
+          buffer[startY + mmH][startX + mx] = '─';
+        }
+        buffer[startY - 1][startX - 1] = '┌';
+        buffer[startY - 1][startX + mmW] = '┐';
+        buffer[startY + mmH][startX - 1] = '└';
+        buffer[startY + mmH][startX + mmW] = '┘';
+      }
+
+      // 3. Center crosshair
+      const midY = Math.floor(h / 2);
+      const midX = Math.floor(w / 2);
+      if (buffer[midY] && buffer[midY][midX]) {
+        buffer[midY][midX] = '+';
+        if (midX > 1 && midX < w - 2) {
+          buffer[midY][midX - 1] = ' ';
+          buffer[midY][midX + 1] = ' ';
+        }
+      }
+
+      // 4. Help modal overlay if toggled
+      if (showHelpModal) {
+        const helpBox = [
+          "╔═══════════════════════════════════════╗",
+          "║       ASCII 3D ENGINE CONTROLS        ║",
+          "╠═══════════════════════════════════════╣",
+          "║ [W / ▲]        : Move Forward         ║",
+          "║ [S / ▼]        : Move Backward        ║",
+          "║ [A / D]        : Strafe Left / Right  ║",
+          "║ [Q / E] or [◀/▶]: Turn Left / Right    ║",
+          "║ [Drag / Swipe] : Mouse / Touch Look   ║",
+          "║ [M]            : Toggle Mini-Map      ║",
+          "║ [H]            : Close Help           ║",
+          "╚═══════════════════════════════════════╝"
+        ];
+        const boxH = helpBox.length;
+        const boxW = helpBox[0].length;
+        const boxStartY = Math.max(0, Math.floor((h - boxH) / 2));
+        const boxStartX = Math.max(0, Math.floor((w - boxW) / 2));
+
+        for (let by = 0; by < boxH; by++) {
+          for (let bx = 0; bx < boxW; bx++) {
+            if (boxStartY + by < h && boxStartX + bx < w) {
+              buffer[boxStartY + by][boxStartX + bx] = helpBox[by][bx];
+            }
+          }
+        }
+      }
+    }
+
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let currentFps = 60;
+    let fpsTimer = 0;
+
+    function gameLoop(now) {
+      const dt = Math.min(0.08, (now - lastTime) / 1000);
+      lastTime = now;
+
+      frameCount++;
+      fpsTimer += dt;
+      if (fpsTimer >= 0.5) {
+        currentFps = Math.round(frameCount / fpsTimer);
+        frameCount = 0;
+        fpsTimer = 0;
+      }
+
+      // Physics and motion updates
+      movePlayer(dt);
+
+      // Allocate 2D text buffer matrix
+      const buffer = [];
+      for (let y = 0; y < SCREEN_H; y++) {
+        buffer.push(new Array(SCREEN_W).fill(' '));
+      }
+
+      // Render graphics pipeline
+      renderRaycastFrame(buffer, SCREEN_W, SCREEN_H, now * 0.001);
+      renderSprites(buffer, SCREEN_W, SCREEN_H, now * 0.001);
+      overlayHUD(buffer, SCREEN_W, SCREEN_H, currentFps);
+
+      // Convert buffer rows directly into text output
+      let textOut = '';
+      for (let y = 0; y < SCREEN_H; y++) {
+        textOut += buffer[y].join('') + '\n';
+      }
+      screenPre.textContent = textOut;
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Startup sequence
+    window.addEventListener('load', () => {
+      adjustScreenResolution();
+      applyTheme(0);
+      requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>
