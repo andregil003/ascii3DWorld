@@ -1,24 +1,25 @@
 # ascii3DWorld
 
-ASCII 3D raycaster corriendo 100% en el navegador — estilo terminal CRT, sin dependencias.
+ASCII-FPS corriendo en el navegador (canvas + texto ASCII), sin dependencias.
 
-Abre `index.html` o entra al GitHub Pages deploy.
+Vivo en: https://andregil003.github.io/ascii3DWorld/
 
-## Controles
+Historial en este repo:
+- `v4 — pueblito` (commit previo, desde `Downloads/index.html`)
+- `v5` actual (desde `Downloads/index (1).html`, copiado byte-por-byte como `index.html`)
 
-- `W / ↑` : avanzar
-- `S / ↓` : retroceder
-- `A / D` : strafe izq / der
-- `Q / E` o `← / →` : girar
-- Drag / swipe : mirar con mouse o touch
-- `M` : toggle minimapa
-- `H` o botón HELP : ayuda
+## Controles (v5)
 
-Botones abajo: `PALETTE` (verde/ámbar/cyan/mono), `TOGGLE MAP`, `RES HIGH/RETRO`, `HELP`.
+- Click para jugar (bloquea el mouse)
+- `WASD` moverse · mouse mirar · `SHIFT` correr
+- `N` cambia la hora · `H` congela/reanuda el tiempo
+- `M` minimapa · `F` scanlines · `- / =` tamaño del texto
+
+HUD: FPS, posición, fase del día, corazones, minimapa, mensajes en pantalla.
 
 ## Correr local
 
-Doble click a `index.html`. No necesita build ni server.
+Abre `index.html` con doble click. No necesita build ni server.
 
 ## Deploy
 
