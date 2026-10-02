@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>ascii-fps v5</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -48,6 +48,39 @@
   #boss { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); width: 36%; height: 10px; z-index: 4; display: none;
     border: 1px solid rgba(255,255,255,.5); background: rgba(0,0,0,.6); }
   #boss div { height: 100%; width: 100%; background: linear-gradient(90deg, #b01818, #ef4b4b); }
+  #sta { position: absolute; top: 38px; left: 14px; z-index: 4; width: 150px; height: 8px; border: 1px solid rgba(255,255,255,.4); background: rgba(0,0,0,.55); pointer-events: none; }
+  #sta div { height: 100%; width: 100%; background: linear-gradient(90deg, #3aa85a, #8fe07a); }
+  #sta.flash { border-color: #ff5a5a; }
+  #quest { position: absolute; top: 54px; left: 14px; z-index: 4; font-size: 12px; line-height: 1.5; color: #ffe9a8; text-shadow: 0 0 3px #000; pointer-events: none; }
+  #quest .ok { color: #8ef59a; }
+  #pdmg { position: absolute; top: 34%; left: 50%; transform: translateX(-50%); z-index: 4; font-size: 34px; font-weight: bold; color: #ff5a5a;
+    text-shadow: 0 0 6px #000; opacity: 0; transition: opacity .5s; pointer-events: none; }
+  #charge { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); width: 90px; height: 6px; z-index: 4; display: none;
+    border: 1px solid rgba(255,255,255,.5); background: rgba(0,0,0,.5); pointer-events: none; }
+  #charge div { height: 100%; width: 0; background: #9ac8ff; }
+  #note { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 7; font-size: 13px; padding: 4px 12px; border-radius: 4px;
+    background: rgba(0,0,0,.7); color: #bff5c4; opacity: 0; transition: opacity .4s; pointer-events: none; }
+  #menu { display: flex; flex-direction: column; gap: 8px; width: 260px; margin: 16px auto; }
+  #menu button { font: inherit; font-size: 15px; padding: 9px 12px; border-radius: 6px; cursor: pointer; color: #eafbe6;
+    background: rgba(40,70,50,.8); border: 1px solid rgba(160,255,180,.4); }
+  #menu button:hover { background: rgba(60,110,76,.9); }
+  #ovmsg { min-height: 22px; color: #ffe9a8; margin-top: 6px; }
+  #opts { width: 320px; margin: 0 auto 10px; text-align: left; font-size: 13px; }
+  #opts label { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 3px 0; }
+  #opts input[type=range] { width: 150px; }
+  #help { font-size: 12px; opacity: .8; max-width: 640px; margin: 8px auto 0; }
+  #screen { touch-action: none; }
+  #touch { position: absolute; inset: 0; z-index: 5; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #touch > * { pointer-events: auto; touch-action: none; }
+  #lookpad { position: absolute; right: 0; top: 0; width: 58%; height: 100%; }
+  #joy { position: absolute; left: 4vmin; bottom: 6vmin; width: 26vmin; height: 26vmin; border-radius: 50%; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.3); }
+  #knob { position: absolute; left: 50%; top: 50%; width: 11vmin; height: 11vmin; margin: -5.5vmin 0 0 -5.5vmin; border-radius: 50%; background: rgba(255,255,255,.35); }
+  .tb { position: absolute; width: 14vmin; height: 14vmin; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 6vmin; color: #fff; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.35); }
+  #tAtk { right: 5vmin; bottom: 10vmin; width: 19vmin; height: 19vmin; font-size: 9vmin; }
+  #tJump { right: 27vmin; bottom: 5vmin; } #tDodge { right: 26vmin; bottom: 21vmin; } #tUse { right: 5vmin; bottom: 33vmin; }
+  #tBlk { right: 43vmin; bottom: 8vmin; } #tWpn { right: 43vmin; bottom: 24vmin; } #tEat { right: 22vmin; bottom: 37vmin; width: 11vmin; height: 11vmin; }
+  #tMenu { left: calc(50% - 4.5vmin); top: 1vmin; width: 9vmin; height: 9vmin; font-size: 5vmin; }
   #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,.84); color: #d8ffd8; font-size: 14px; line-height: 1.8;
     text-align: center; cursor: pointer; z-index: 6; padding: 20px; }
@@ -62,6 +95,11 @@
     <canvas id="cv"></canvas>
     <canvas id="mini"></canvas>
     <div id="hearts"></div>
+    <div id="sta"><div id="staf"></div></div>
+    <div id="quest"></div>
+    <div id="pdmg"></div>
+    <div id="charge"><div id="chargef"></div></div>
+    <div id="note"></div>
     <div id="inv"></div>
     <div id="boss"><div id="bossf"></div></div>
     <div id="hurt"></div>
@@ -70,14 +108,32 @@
     <div id="cross">+</div>
     <div id="prompt"></div>
     <div id="msg"></div>
-    <div id="toast">WASD · mouse (mira arriba/abajo) · click atacar · 1/2 arma · K escudo · Q comer · E hablar/abrir · ESPACIO saltar</div>
+    <div id="toast">WASD · mouse · click atacar (mantén = golpe fuerte) · X esquivar · K escudo · E hablar · Esc menú</div>
     <div id="overlay"><div id="ovtext">
-      <div class="big">ASCII-FPS v5</div><br>
-      <div><b>CLICK PARA JUGAR</b></div><br>
-      <div>WASD moverse · SHIFT correr · ESPACIO saltar · mouse mirar (también RePág/AvPág)</div>
-      <div>CLICK o J: atacar · 1 espada / 2 arco · K o click derecho: escudo · Q: comer hongo · E: hablar / abrir</div>
-      <div>N hora · H pausa el tiempo · C clima</div>
-      <div>M minimapa · G mundo nuevo · F scanlines · -/= tamaño del texto</div>
+      <div class="big">ASCII-FPS v5</div>
+      <div id="ovmsg"></div>
+      <div id="menu">
+        <button id="bPlay">Jugar</button>
+        <button id="bSave">Guardar</button>
+        <button id="bLoad">Cargar partida</button>
+        <button id="bOpt">Opciones</button>
+        <button id="bNew">Mundo nuevo</button>
+      </div>
+      <div id="opts" style="display:none">
+        <label>Sensibilidad <input type="range" id="oSens" min="30" max="250"></label>
+        <label>Tamaño del texto <input type="range" id="oFont" min="8" max="18"></label>
+        <label>Campo de visión <input type="range" id="oFov" min="60" max="100"></label>
+        <label>Invertir eje Y <input type="checkbox" id="oInv"></label>
+        <label>Minimapa <input type="checkbox" id="oMini"></label>
+        <label>Números de daño <input type="checkbox" id="oNums"></label>
+        <label>Autoguardado <input type="checkbox" id="oAuto"></label>
+        <label>Controles táctiles <select id="oTouch"><option value="auto">Automático</option><option value="on">Siempre</option><option value="off">Nunca</option></select></label>
+      </div>
+      <div id="help">
+        WASD moverse · SHIFT correr · ESPACIO saltar · X esquivar · mouse mirar (RePág/AvPág también)<br>
+        CLICK/J atacar (mantén ~medio segundo y suelta = golpe fuerte; con arco, mantén para tensar) · K o click derecho: escudo<br>
+        1 espada · 2 arco · Q comer hongo · E hablar/abrir · N hora · H pausa el tiempo · C clima · M minimapa · Esc menú
+      </div>
     </div></div>
   </div>
 </div>
@@ -118,7 +174,7 @@ function newLevel(type, W, H, fill) {
   const g = [], f = [], h = [];
   for (let y = 0; y < H; y++) { g.push(new Array(W).fill(fill || ".")); f.push(new Array(W).fill("grass")); h.push(new Array(W).fill(-1)); }
   return { type, W, H, grid: g, fgrid: f, hid: h, hg: new Float32Array(W * H), spr: [], lamps: [], act: [], obst: [], ceil: 1.9,
-    houses: [], walk: [], spawn: { x: 2, y: 2, ang: 0 }, cg: null, mm: null, ret: null, picks: [], prj: [] };
+    houses: [], walk: [], spawn: { x: 2, y: 2, ang: 0 }, cg: null, mm: null, ret: null, picks: [], prj: [], taken: [], deadM: [], pk: 0, pk0: 1e9 };
 }
 function setLevel(l) {
   LV = l; grid = l.grid; fgrid = l.fgrid; hid = l.hid; MW = l.W; MH = l.H; SPR = l.spr; LAMPS = l.lamps; HG = l.hg;
@@ -308,14 +364,16 @@ function genOverworld(seed) {
   // ---- aldeanos ----
   for (let k = 0; k < 6; k++) {
     const p = Lv.walk[Math.floor(R() * Lv.walk.length)];
-    Lv.act.push(add(Lv, "villager", p[0], p[1], mkVillager(R, k, Object.assign({ home: k % Lv.houses.length }, k === 0 ? { smith: true, name: "Herrero", shirt: [70,52,40], hair: [20,16,14], beard: true, hat: null } : {}))));
+    Lv.act.push(add(Lv, "villager", p[0], p[1], mkVillager(R, k, Object.assign({ home: k % Lv.houses.length, qid: k - 1 }, k === 0 ? { smith: true, name: "Herrero", shirt: [70,52,40], hair: [20,16,14], beard: true, hat: null } : {}))));
   }
+  for (const v of Lv.act) if (v.qid >= 0) v.marker = add(Lv, "marker", v.x, v.y, { w: 0.22, h: 0.32, z: 1.2, sh: 0, kind: "!" });
   // ---- interiores y cueva ----
   Lv.houses.forEach(h => { h.level = genHouse(Lv, h, seed); });
   Lv.caveLevel = null;
   for (let tries = 0; tries < 12 && !Lv.caveLevel; tries++) Lv.caveLevel = genCave(seed + tries * 31);
   if (!Lv.caveLevel) return null;
   Lv.caveLevel.ret = { lvl: Lv, x: Lv.caveDoor.outX, y: Lv.caveDoor.outY, ang: Lv.caveDoor.ang };
+  Lv.pk0 = Lv.pk;
   return Lv;
 }
 
@@ -434,11 +492,11 @@ function genCave(seed) {
     else if (r < 0.068) addPick(Lv, "coin", f[0] + 0.3 + R() * 0.4, f[1] + 0.3 + R() * 0.4, "coin", { w: 0.4, h: 0.4, z: 0.25, sh: 0 });
   }
   Lv.obst = Lv.spr.filter(s => s.r > 0);
-  zs.forEach((p, k) => mkMob(Lv, p.type, p.x, p.y, k * 7));
+  zs.forEach((p, k) => { mkMob(Lv, p.type, p.x, p.y, k * 7).mid = k; });
   const bf = floors.find(f => { const d = Math.hypot(f[0] - far[0], f[1] - far[1]); return d >= 3 && d <= 5; }) || far;
-  Lv.boss = mkMob(Lv, "boss", bf[0] + 0.5, bf[1] + 0.5, 99);
+  Lv.boss = mkMob(Lv, "boss", bf[0] + 0.5, bf[1] + 0.5, 99); Lv.boss.mid = 99;
   Lv.spawn = { x: sx + 0.9, y: sy + 0.5, ang: 0 };
-  Lv.walk = [];
+  Lv.walk = []; Lv.pk0 = Lv.pk;
   return Lv;
 }
 
@@ -446,7 +504,8 @@ function genCave(seed) {
 //  CÁMARA / BUFFERS
 // ============================================================
 let FONT = 12, boost = 0, LH = 12, DPR = 1, COLS = 200, ROWS = 60, cw = 7, PK = 80;
-const FOVH = 74 * Math.PI / 180, TAN = Math.tan(FOVH / 2);
+let FOVH = 74 * Math.PI / 180, TAN = Math.tan(FOVH / 2);
+function setFov(d) { FOVH = d * Math.PI / 180; TAN = Math.tan(FOVH / 2); if (bgB) fit(); }
 const screen = $("screen"), cv = $("cv"), ctx = cv.getContext("2d");
 let bgB, fgB, chB, HD, HS0, HS1, HN;
 function fit() {
@@ -470,7 +529,7 @@ const EYE0 = 0.95;
 let px = 0, py = 0, ang = 0, pitch = 0, pz = 0, vz = 0, EYE = 0.95;
 let keys = {}, locked = false, dayT = 0.12, autoDay = true, T = 0;
 const DAY_LEN = 170;
-const P = { hp: 10, max: 10, swing: -1, hitDone: false, tcool: 0, hurtT: 0, regen: 0, dead: false, moving: false, kills: 0, sword: 0, shield: false, bow: false, wpn: 1, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5 };
+const P = { hp: 10, max: 10, swing: -1, hitDone: false, tcool: 0, hurtT: 0, regen: 0, dead: false, moving: false, kills: 0, sword: 0, shield: false, bow: false, wpn: 1, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5, sta: 100, staMax: 100, staDelay: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, ddx: 0, ddy: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0 };
 
 // ============================================================
 //  CLIMA
@@ -1095,6 +1154,7 @@ function spritePixel(s, u, v) {
     case "coin": { const wd = Math.abs(Math.cos(T * 4 + s.seed)) * 0.4 + 0.06; if (Math.hypot((u - 0.5) / wd, (v - 0.5) / 0.42) < 1) { S([255,205,60], 1, [255,246,170], 1, wd > 0.25 ? "o" : "|", 1); return true; } return false; }
     case "arrow": { if (Math.abs(v - 0.5) < 0.12) { if (u > 0.82) S([200,204,214], 1, [240,244,255], 1, ">", 1); else if (u < 0.16) S([240,240,236], 1, [255,255,255], 1, "=", 1); else S([150,104,58], 1, [210,160,100], 1, "-", 1); return true; } return false; }
     case "arrowpick": { for (let k = -1; k <= 1; k++) if (Math.abs(v - (0.5 + k * 0.18) - (u - 0.5) * 0.25) < 0.07) { if (u > 0.8) S([200,204,214], 1, [240,244,255], 1, ">", 1); else S([150,104,58], 1, [210,160,100], 1, "-", 1); return true; } return false; }
+    case "marker": { const q = s.kind; if (!q) return false; const col = q === "?" ? [110,230,120] : [255,214,70]; S(col, 1, [50,30,0], 1, (u > 0.36 && u < 0.64 && v > 0.3 && v < 0.7) ? q : " ", 1); return true; }
     case "fountain": {
       const be = (u - 0.5) / 0.5, bey = (v - 0.84) / 0.16, r2 = be * be + bey * bey;
       if (v > 0.68 && r2 < 1) {
@@ -1283,7 +1343,9 @@ function drawWeather() {
 const SW_T = 0.34;
 function drawSword() {
   const sw = P.swing, sw2 = SWORDS[P.sword]; let th;
-  if (sw >= 0) { const k = clamp(sw / SW_T, 0, 1), e = k * k * (3 - 2 * k); th = lerp(-0.55, 1.25, e); } else th = 0.36 + 0.03 * Math.sin(T * 2);
+  if (sw >= 0) { const k = clamp(sw / (P.heavy ? 0.55 : SW_T), 0, 1), e = k * k * (3 - 2 * k); th = P.heavy ? lerp(-1.05, 1.55, e) : lerp(-0.55, 1.25, e); }
+  else if (P.charging && P.chargeT > 0.12) { const k = Math.min(1, P.chargeT / 0.5); th = lerp(0.36, -0.85, k) + (k >= 1 ? 0.03 * Math.sin(T * 40) : 0); }
+  else th = 0.36 + 0.03 * Math.sin(T * 2);
   const bob = P.moving ? Math.sin(T * 9) * cv.height * 0.008 : 0;
   const pvx = cv.width * 0.8, pvy = cv.height * 1.04 + bob, len = cv.height * 0.68, wid = cv.height * 0.04;
   const ax = -Math.sin(th), ay = -Math.cos(th), qx = Math.cos(th), qy = -Math.sin(th);
@@ -1318,7 +1380,7 @@ function drawShield() {
 }
 function drawBow() {
   const cxp = cv.width * 0.8, cyp = cv.height * 0.66, R = cv.height * 0.4, th = cv.height * 0.03;
-  const sxp = -R * 0.54 + (P.shotAnim > 0 ? 0 : R * 0.2), armed = INV.arrow > 0 && P.shotAnim <= 0;
+  const pull = P.charging ? Math.min(1, P.chargeT / 0.8) : 0, sxp = -R * 0.54 + (P.shotAnim > 0 ? 0 : R * (0.2 + 0.25 * pull)), armed = INV.arrow > 0 && P.shotAnim <= 0;
   for (let y = 0; y < ROWS; y++) for (let x = Math.floor(COLS * 0.3); x < COLS; x++) {
     const rx = (x + 0.5) * cw - cxp, ry = (y + 0.5) * LH - cyp, r = Math.hypot(rx, ry);
     let ok = false;
@@ -1339,7 +1401,7 @@ function bodyCol(az, hz) {
 }
 function render(dt) {
   T += dt; envUpdate();
-  EYE = EYE0 + pz;
+  EYE = EYE0 + pz - (P.dodgeT > 0 ? 0.28 * Math.sin(Math.PI * (1 - P.dodgeT / 0.24)) : 0);
   const dirX = Math.cos(ang), dirY = Math.sin(ang), plX = -dirY * TAN, plY = dirX * TAN;
   const hz = Math.round(ROWS * 0.5 + Math.tan(pitch) * PK), over = LV.type === "over", CEIL = LV.ceil;
   const now = new Date();
@@ -1384,6 +1446,7 @@ function render(dt) {
     }
   }
   drawSprites(hz, dirX, dirY, plX, plY);
+  drawNums(hz, dirX, dirY, plX, plY);
   drawWeather();
   if (P.blocking && P.shield) drawShield(); else if (P.wpn === 2 && P.bow) drawBow(); else drawSword();
   present();
@@ -1478,7 +1541,7 @@ function mkMob(Lv, type, x, y, seed) {
   else if (type === "bat") Object.assign(o, { fly: true, z: 1.1, sh: 0 });
   const s = add(Lv, type, x, y, o); Lv.act.push(s); return s;
 }
-function addPick(Lv, type, x, y, pick, o) { const s = add(Lv, type, x, y, Object.assign({ pick, sh: 0.3 }, o || {})); Lv.picks.push(s); return s; }
+function addPick(Lv, type, x, y, pick, o) { const s = add(Lv, type, x, y, Object.assign({ pick, sh: 0.3 }, o || {})); s.pid = Lv.pk++; Lv.picks.push(s); return s; }
 function removeSprite(s) { const k = SPR.indexOf(s); if (k >= 0) SPR.splice(k, 1); }
 
 function blockedFor(x, y, self, r0) {
@@ -1505,10 +1568,6 @@ function triggerAt(x, y) {
 function fadeFlash() {
   const f = $("fade"); f.style.transition = "none"; f.style.opacity = 1;
   requestAnimationFrame(() => { f.style.transition = "opacity .7s"; f.style.opacity = 0; });
-}
-function goto(level, x, y, a) {
-  setLevel(level); px = x; py = y; ang = a; pitch = 0; pz = 0; vz = 0; P.tcool = 0.9; fadeFlash();
-  if (level.type === "cave") say("Se siente el aire frío. Algo se mueve en la oscuridad…", 3200);
 }
 function doTrigger(tr) {
   if (LV.type === "over") {
@@ -1558,59 +1617,12 @@ function applyOffer(o) {
   else if (o.id === "arrows") INV.arrow += 10;
   else if (o.id === "iron") { P.sword = 2; P.wpn = 1; }
 }
-function smithTalk() {
-  if (INV.crystal > 0) { const g = INV.crystal * 6; INV.coin += g; INV.crystal = 0; drawInv(); say("Herrero: ¡Buenos cristales! Te doy " + g + " monedas.", 3500); return; }
-  const av = OFFERS.filter(o => o.ok());
-  if (!av.length) { say("Herrero: ya tienes todo lo que vendo. ¡Ve por ese rey zombi!", 3500); return; }
-  if (offerT > 0 && offerI >= 0 && OFFERS[offerI].ok()) {
-    const o = OFFERS[offerI];
-    if (INV.coin >= o.cost) { INV.coin -= o.cost; applyOffer(o); offerI = -1; offerT = 0; drawInv(); say("Herrero: " + o.name + " lista. ¡Suerte allá abajo!", 3500); return; }
-    say("Herrero: te faltan " + (o.cost - INV.coin) + " monedas para la " + o.name + ".", 3000);
-  }
-  let k = offerI; do { k = (k + 1) % OFFERS.length; } while (!OFFERS[k].ok());
-  offerI = k; offerT = 9;
-  say("Herrero: " + OFFERS[k].name + " por " + OFFERS[k].cost + " monedas. Háblame otra vez para comprar.", 4200);
-}
-function interact() {
-  const t = nearInteract(); if (!t) return;
-  if (t.type === "chest") {
-    if (LV.boss && !(LV.boss.dead > 0)) { say("Un poder oscuro mantiene sellado el cofre…", 2800); return; }
-    t.open = true; P.hp = P.max; if (P.sword < 2) P.sword = 2; P.wpn = 1; INV.coin += 12; INV.arrow += 10; drawHearts(); drawInv();
-    say("¡Tesoro! Espada de hierro, 12 monedas, flechas y toda tu vida.", 4800);
-  } else if (t.smith) { smithTalk(); t.face = 1; }
-  else { const ln = LINES[(t.line++) % LINES.length]; say(t.name + ": " + ln(), 4800); t.face = 1; }
-}
-function hurt(n) {
-  if (P.dead || n <= 0) return;
-  P.hp = Math.max(0, P.hp - n); P.hurtT = 0.35; P.regen = 0; drawHearts();
-  const h = $("hurt"); h.style.opacity = 1; setTimeout(() => { h.style.opacity = 0; }, 180);
-  if (P.hp <= 0) die();
-}
-function hurtP(dmg, sx, sy, kind) {
-  if (P.dead) return;
-  if (P.blocking && P.shield) {
-    const dx = sx - px, dy = sy - py, d = Math.hypot(dx, dy) || 1;
-    if ((dx * Math.cos(ang) + dy * Math.sin(ang)) / d > 0.2) { P.blockFlash = 0.18; dmg = kind === "slam" ? Math.max(0, dmg - 1) : 0; if (dmg <= 0) return; }
-  }
-  hurt(dmg);
-}
 function hitPlayer(dmg, a, push, kind) {
   const before = P.hp; hurtP(dmg, a.x, a.y, kind);
   if (push && P.hp < before) {
     const dx = px - a.x, dy = py - a.y, d = Math.hypot(dx, dy) || 1, kx = px + dx / d * push, ky = py + dy / d * push;
     if (!blockedFor(kx, py, null, 0.2)) px = kx; if (!blockedFor(px, ky, null, 0.2)) py = ky;
   }
-}
-function die() {
-  P.dead = true; document.exitPointerLock && document.exitPointerLock();
-  $("ovtext").innerHTML = '<div class="big">CAÍSTE</div><br><div>La oscuridad te alcanzó.</div><br><div><b>CLICK PARA REAPARECER</b></div>';
-  $("overlay").classList.remove("hidden");
-}
-function respawn() {
-  P.dead = false; P.hp = P.max; drawHearts();
-  for (const a of WORLD.caveLevel.act) if (a.mob) a.cd = 1;
-  setLevel(WORLD); px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; pitch = 0; fadeFlash();
-  $("ovtext").innerHTML = '<div class="big">ASCII-FPS v5</div><br><div><b>CLICK PARA JUGAR</b></div>';
 }
 function drawHearts() {
   let s = ""; for (let i = 0; i < P.max; i++) s += '<span class="' + (i < P.hp ? "f" : "e") + '">♥</span>';
@@ -1629,56 +1641,15 @@ function drawInv() {
 }
 
 // ---- combate del jugador ----
-function attack() {
-  if (P.dead || P.blocking) return;
-  if (P.wpn === 2 && P.bow) { shoot(); return; }
-  if (P.swing >= 0) return;
-  P.swing = 0; P.hitDone = false;
-}
-function shoot() {
-  if (P.shotCd > 0) return;
-  if (INV.arrow <= 0) { say("No te quedan flechas.", 1500); return; }
-  INV.arrow--; drawInv(); P.shotCd = 0.55; P.shotAnim = 0.25;
-  const dx = Math.cos(ang), dy = Math.sin(ang), sp = 15;
-  const a = add(LV, "arrow", px + dx * 0.4, py + dy * 0.4, { w: 0.5, h: 0.12, z: EYE - 0.18, sh: 0, vx: dx * sp, vy: dy * sp, vz: Math.tan(pitch) * sp, life: 2.5, from: "player" });
-  LV.prj.push(a);
-}
 function fireArrow(x, y, z, tx, ty, tz, speed, from) {
   const dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy) || 1, t = d / speed;
   const a = add(LV, "arrow", x, y, { w: 0.5, h: 0.12, z, sh: 0, vx: dx / d * speed, vy: dy / d * speed, vz: (tz - z) / t + 0.8 * t, life: 3, from });
   LV.prj.push(a);
 }
-function damageMob(a, dmg, kx, ky) {
-  if (a.dead > 0) return;
-  a.hp -= dmg; a.flash = 0.22;
-  if (kx !== undefined && !a.fly) {
-    const f = a.type === "boss" ? 0.25 : 1, nx = a.x + kx * f, ny = a.y + ky * f;
-    if (!blockedFor(nx, a.y, a, 0.22)) a.x = nx; if (!blockedFor(a.x, ny, a, 0.22)) a.y = ny;
-  }
-  if (a.type === "boss") a.aggro = true;
-  if (a.hp <= 0) { a.dead = 0.001; P.kills++; dropLoot(a); if (a.type === "boss") say("¡El rey zombi cayó! El cofre ya no está sellado.", 4200); }
-}
 function dropLoot(a) {
   const M = MOB[a.type], n = M.coins[0] + Math.floor(Math.random() * (M.coins[1] - M.coins[0] + 1));
   for (let k = 0; k < n; k++) addPick(LV, "coin", a.x + (Math.random() - 0.5) * (n > 3 ? 2 : 0.8), a.y + (Math.random() - 0.5) * (n > 3 ? 2 : 0.8), "coin", { w: 0.4, h: 0.4, z: 0.25, sh: 0 });
   if (a.type === "skeleton" && Math.random() < 0.6) addPick(LV, "arrowpick", a.x, a.y, "arrow", { w: 0.6, h: 0.5, z: 0.1, sh: 0 });
-}
-function swordHit() {
-  const cs = Math.cos(ang), sn = Math.sin(ang), dmg = SWORDS[P.sword].dmg;
-  for (const a of LV.act) {
-    if (!a.mob || a.dead > 0 || a.hidden) continue;
-    const dx = a.x - px, dy = a.y - py, d = Math.hypot(dx, dy);
-    if (d < 2.0 && (dx * cs + dy * sn) / (d || 1) > 0.78) damageMob(a, dmg, dx / (d || 1) * 0.6, dy / (d || 1) * 0.6);
-  }
-}
-function pickups() {
-  const pk = LV.picks;
-  for (let i = pk.length - 1; i >= 0; i--) {
-    const s = pk[i]; if (Math.hypot(s.x - px, s.y - py) > 0.85) continue;
-    pk.splice(i, 1); removeSprite(s);
-    if (s.pick === "coin") INV.coin++; else if (s.pick === "crystal") INV.crystal++; else if (s.pick === "mush") INV.mush++; else if (s.pick === "arrow") INV.arrow += 3;
-    drawInv();
-  }
 }
 function updateProjectiles(dt) {
   for (let i = LV.prj.length - 1; i >= 0; i--) {
@@ -1689,7 +1660,7 @@ function updateProjectiles(dt) {
       for (const m of LV.act) {
         if (!m.mob || m.dead > 0 || m.hidden) continue;
         const base = m.fly ? m.z : 0;
-        if (Math.hypot(m.x - a.x, m.y - a.y) < m.r + 0.18 && a.z >= base - 0.15 && a.z <= base + m.h + 0.15) { damageMob(m, 2, a.vx * 0.03, a.vy * 0.03); gone = true; break; }
+        if (Math.hypot(m.x - a.x, m.y - a.y) < m.r + 0.18 && a.z >= base - 0.15 && a.z <= base + m.h + 0.15) { damageMob(m, a.dmg || 2, a.vx * 0.03, a.vy * 0.03); gone = true; break; }
       }
     } else if (!gone && a.from === "enemy" && !P.dead) {
       if (Math.hypot(px - a.x, py - a.y) < 0.4 && a.z > pz - 0.1 && a.z < EYE + 0.2) { hurtP(1, a.x - a.vx * 0.2, a.y - a.vy * 0.2, "arrow"); gone = true; }
@@ -1820,53 +1791,401 @@ function updateActors(dt) {
 }
 
 // ============================================================
-//  LOOP
+//  EXTRAS v5b: opciones, números de daño, misiones, guardado, menú, táctil
 // ============================================================
-let WORLD = null, last = 0, frames = 0, ftime = 0, mouseR = false;
-const fpsEl = $("fps"), posEl = $("pos"), overlay = $("overlay"), promptEl = $("prompt");
-function resetPlayer() {
-  Object.assign(P, { hp: 10, max: 10, swing: -1, dead: false, sword: 0, shield: false, bow: false, wpn: 1, kills: 0, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5 });
-  INV.coin = 0; INV.crystal = 0; INV.mush = 0; INV.arrow = 0; offerI = -1; offerT = 0;
+function readJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
+const SAVE_KEY = "asciifps5", OPT_KEY = "asciifps5opts";
+const OPT = Object.assign({ sens: 1, invY: false, font: 12, fov: 74, mini: true, nums: true, auto: true, touch: "auto" }, readJSON(OPT_KEY));
+function saveOpts() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} }
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+let noteT = 0;
+function note(t) { const n = $("note"); n.textContent = t; n.style.opacity = 1; clearTimeout(noteT); noteT = setTimeout(() => { n.style.opacity = 0; }, 1800); }
+
+// ---- números de daño ----
+const FXL = [];
+function spawnNum(x, y, z, txt, rgb) { if (!OPT.nums) return; FXL.push({ x: x + (Math.random() - 0.5) * 0.5, y, z: z + Math.random() * 0.15, txt, col: pack(rgb[0], rgb[1], rgb[2]), life: 0.9 }); if (FXL.length > 40) FXL.shift(); }
+function updateFX(dt) { for (let i = FXL.length - 1; i >= 0; i--) { const f = FXL[i]; f.life -= dt; f.z += 0.7 * dt; if (f.life <= 0) FXL.splice(i, 1); } }
+function drawNums(hz, dirX, dirY, plX, plY) {
+  if (!FXL.length) return;
+  const inv = 1 / (plX * dirY - dirX * plY);
+  for (const f of FXL) {
+    const rx = f.x - px, ry = f.y - py, ty = inv * (-plY * rx + plX * ry);
+    if (ty < 0.3 || ty > 20) continue;
+    const tx = inv * (dirY * rx - dirX * ry), col = Math.round((COLS / 2) * (1 + tx / ty)), row = Math.round(hz + (EYE - f.z) * PK / ty);
+    if (row < 0 || row >= ROWS) continue;
+    const n = f.txt.length, x0 = col - (n >> 1);
+    for (let k = 0; k < n; k++) {
+      const x = x0 + k; if (x < 0 || x >= COLS || occluded(x, row, ty)) continue;
+      const j = row * COLS + x; dim(j, 0.4); chB[j] = f.txt.charCodeAt(k); fgB[j] = f.col;
+      if (k === 0 && x > 0) dim(j - 1, 0.55); if (k === n - 1 && x < COLS - 1) dim(j + 1, 0.55);
+    }
+  }
 }
-function newWorld(seed) {
-  let w = null, s = seed;
-  for (let i = 0; i < 25 && !w; i++, s++) w = genOverworld(s);
-  WORLD = w; SEED = s; setLevel(WORLD); resetPlayer();
-  px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; pitch = 0; drawHearts(); drawInv();
+
+// ---- aguante ----
+function spend(n) { if (P.sta < n) { P.staFlash = 0.3; return false; } P.sta -= n; P.staDelay = 0.75; return true; }
+
+// ---- misiones ----
+const QUESTS = [
+  { id: "cry",   title: "Cristales",          need: 3, type: "item", item: "crystal", rew: { coin: 20, mush: 2 },
+    ask: "Necesito 3 cristales de la cueva para arreglar el reloj de la torre. ¿Me los traes?", hint: "Los cristales brillan en las paredes de la cueva.", done: "¡Perfectos! El reloj volverá a andar." },
+  { id: "clean", title: "Limpiar la cueva",   need: 8, type: "kill", rew: { coin: 30, heart: 1 },
+    ask: "Las criaturas de la cueva asustan a todos. Elimina 8 y te lo pagaré bien.", hint: "Sigue ahí abajo, no se van solas.", done: "¡Se acabó el susto! Gracias, valiente." },
+  { id: "wolf",  title: "Lobos",              need: 3, type: "wolf", rew: { coin: 25, arrow: 10 },
+    ask: "Los lobos rondan de noche. Cázame 3 y te daré flechas.", hint: "Salen cuando oscurece, lejos de los faroles.", done: "¡Qué alivio! Toma estas flechas." },
+  { id: "mush",  title: "Hongos rojos",       need: 5, type: "item", item: "mush", rew: { coin: 15, arrow: 5 },
+    ask: "Quiero 5 hongos rojos del bosque para una sopa. ¿Los buscas?", hint: "Crecen entre los árboles, fuera del pueblo.", done: "¡Qué buena sopa saldrá!" },
+  { id: "king",  title: "El rey zombi",       need: 1, type: "boss", rew: { coin: 60, heart: 1 },
+    ask: "Un rey zombi manda en lo más hondo de la cueva. Derrótalo y el pueblo te lo agradecerá siempre.", hint: "Está en el fondo, custodiando un cofre.", done: "¡Eres un héroe! Este es el pago prometido." },
+];
+const QS = {};
+const qState = q => QS[q.id] ? QS[q.id].state : "new";
+function qProg(q) { const s = QS[q.id]; if (!s) return 0; return Math.min(q.need, q.type === "item" ? INV[q.item] : s.prog); }
+const qReady = q => qState(q) === "active" && qProg(q) >= q.need;
+function onKillQuest(a) {
+  for (const q of QUESTS) {
+    const s = QS[q.id]; if (!s || s.state !== "active") continue;
+    if (q.type === "kill" && a.type !== "wolf" && LV.type === "cave") s.prog++;
+    else if (q.type === "wolf" && a.type === "wolf") s.prog++;
+    else if (q.type === "boss" && a.type === "boss") s.prog++;
+  }
+  drawQuests();
+}
+function giveReward(q) {
+  const r = q.rew, parts = [];
+  if (r.coin) { INV.coin += r.coin; parts.push(r.coin + " monedas"); }
+  if (r.mush) { INV.mush += r.mush; parts.push(r.mush + " hongos"); }
+  if (r.arrow) { INV.arrow += r.arrow; parts.push(r.arrow + " flechas"); }
+  if (r.heart && P.max < 14) { P.max++; P.hp = P.max; parts.push("un corazón extra"); drawHearts(); }
+  drawInv(); return parts.join(", ");
+}
+function questTalk(v) {
+  const q = QUESTS[v.qid]; if (!q) return false;
+  const st = qState(q);
+  if (st === "new") { QS[q.id] = { state: "active", prog: 0 }; say(v.name + ": " + q.ask, 6200); drawQuests(); return true; }
+  if (st === "active") {
+    if (qProg(q) >= q.need) {
+      if (q.type === "item") INV[q.item] -= q.need;
+      QS[q.id].state = "done"; const g = giveReward(q);
+      say(v.name + ": " + q.done + " (+ " + g + ")", 6500); drawQuests(); return true;
+    }
+    say(v.name + ": " + q.hint + " (" + qProg(q) + "/" + q.need + ")", 4500); return true;
+  }
+  return false;
+}
+function drawQuests() {
+  let s = ""; for (const q of QUESTS) if (qState(q) === "active") s += '<div class="q' + (qReady(q) ? " ok" : "") + '">◈ ' + q.title + " " + qProg(q) + "/" + q.need + "</div>";
+  $("quest").innerHTML = s;
+}
+function updateMarkers() {
+  if (LV.type !== "over") return;
+  for (const v of LV.act) {
+    if (v.type !== "villager" || !v.marker) continue;
+    const q = QUESTS[v.qid], st = q ? qState(q) : "done", m = v.marker;
+    m.x = v.x; m.y = v.y; m.z = 1.2 + 0.06 * Math.sin(T * 3 + v.seed);
+    m.kind = st === "new" ? "!" : (qReady(q) ? "?" : "");
+    m.hidden = !!v.hidden || !m.kind;
+  }
+}
+
+// ---- guardado ----
+function applyTaken(lv, list) {
+  lv.taken = (list || []).slice();
+  for (let i = lv.picks.length - 1; i >= 0; i--) if (lv.taken.includes(lv.picks[i].pid)) { const s = lv.picks[i]; lv.picks.splice(i, 1); const k = lv.spr.indexOf(s); if (k >= 0) lv.spr.splice(k, 1); }
+}
+function saveGame(manual) {
+  if (P.dead || !WORLD) return false;
+  const lt = LV.type === "house" ? { type: "house", id: LV.pal.id } : { type: LV.type }, c = WORLD.caveLevel;
+  const sv = { v: 1, seed: SEED, dayT, autoDay, weather: W.name, lvl: lt, x: px, y: py, a: ang, hp: P.hp, max: P.max, sta: P.sta, sword: P.sword, shield: P.shield, bow: P.bow, wpn: P.wpn,
+    inv: INV, qs: QS, kills: P.kills, takenO: WORLD.taken, takenC: c.taken, deadM: c.deadM, chest: !!(c.chest && c.chest.open), snowG: W.snowG };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); } catch (e) { return false; }
+  P.saveT = 0; if (manual) note("Partida guardada"); return true;
+}
+function loadGame() {
+  let sv; try { sv = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
+  if (!sv || sv.v !== 1) return false;
+  let w = null; try { w = genOverworld(sv.seed); } catch (e) { w = null; }
+  if (!w) return false;
+  WORLD = w; SEED = sv.seed; resetPlayer();
+  const c = w.caveLevel;
+  applyTaken(w, sv.takenO); applyTaken(c, sv.takenC);
+  c.deadM = (sv.deadM || []).slice();
+  for (const m of c.act.slice()) if (m.mid !== undefined && c.deadM.includes(m.mid)) { c.act.splice(c.act.indexOf(m), 1); const k = c.spr.indexOf(m); if (k >= 0) c.spr.splice(k, 1); if (m === c.boss) c.boss = null; }
+  if (sv.chest && c.chest) c.chest.open = true;
+  Object.assign(P, { hp: sv.hp, max: sv.max, sta: sv.sta, sword: sv.sword, shield: sv.shield, bow: sv.bow, wpn: sv.wpn, kills: sv.kills || 0 });
+  Object.assign(INV, sv.inv); for (const k in QS) delete QS[k]; Object.assign(QS, sv.qs || {});
+  dayT = sv.dayT; autoDay = sv.autoDay; setWeather(sv.weather); Object.assign(W, WPRE[sv.weather] || WPRE.clear); W.snowG = sv.snowG || 0;
+  const lvl = sv.lvl.type === "house" ? w.houses[sv.lvl.id].level : (sv.lvl.type === "cave" ? c : w);
+  if (lvl !== w) lvl.ret.lvl = w;
+  setLevel(lvl); px = sv.x; py = sv.y; ang = sv.a; pitch = 0;
+  drawHearts(); drawInv(); drawQuests();
+  return true;
+}
+
+// ---- menú / opciones ----
+let menuOpen = true, touchPlaying = false, newArm = 0;
+function isTouch() {
+  if (OPT.touch === "on") return true; if (OPT.touch === "off") return false;
+  return (typeof matchMedia === "function" && matchMedia("(pointer:coarse)").matches) || (typeof window !== "undefined" && "ontouchstart" in window);
+}
+function refreshMenu() { $("bLoad").style.display = hasSave() ? "" : "none"; $("bPlay").textContent = P.dead ? "Reaparecer" : "Jugar"; }
+function showMenu(msg) { menuOpen = true; P.charging = false; overlay.classList.remove("hidden"); $("ovmsg").textContent = msg || ""; refreshMenu(); }
+function play() {
+  if (P.dead) respawn();
+  overlay.classList.add("hidden"); menuOpen = false;
+  if (isTouch()) touchPlaying = true; else { touchPlaying = false; try { screen.requestPointerLock(); } catch (e) {} }
+}
+function applyOpts() {
+  FONT = OPT.font; miniOn = OPT.mini; setFov(OPT.fov);
+}
+function bindMenu() {
+  $("bPlay").onclick = play;
+  $("bSave").onclick = () => { if (saveGame(true)) $("ovmsg").textContent = "Partida guardada"; };
+  $("bLoad").onclick = () => { if (loadGame()) { $("ovmsg").textContent = "Partida cargada"; play(); } else $("ovmsg").textContent = "No se pudo cargar"; };
+  $("bOpt").onclick = () => { const o = $("opts"); o.style.display = o.style.display === "none" ? "block" : "none"; };
+  $("bNew").onclick = () => {
+    if (!newArm) { newArm = 1; $("bNew").textContent = "¿Seguro? Se pierde el progreso"; setTimeout(() => { newArm = 0; $("bNew").textContent = "Mundo nuevo"; }, 3000); return; }
+    newArm = 0; $("bNew").textContent = "Mundo nuevo"; try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    newWorld(Math.floor(Math.random() * 99999) + 1); play();
+  };
+  $("oSens").value = Math.round(OPT.sens * 100); $("oInv").checked = OPT.invY; $("oFont").value = OPT.font; $("oFov").value = OPT.fov;
+  $("oMini").checked = OPT.mini; $("oNums").checked = OPT.nums; $("oAuto").checked = OPT.auto; $("oTouch").value = OPT.touch;
+  $("oSens").oninput = e => { OPT.sens = e.target.value / 100; saveOpts(); };
+  $("oInv").onchange = e => { OPT.invY = e.target.checked; saveOpts(); };
+  $("oFont").oninput = e => { OPT.font = +e.target.value; FONT = OPT.font; fit(); saveOpts(); };
+  $("oFov").oninput = e => { OPT.fov = +e.target.value; setFov(OPT.fov); saveOpts(); };
+  $("oMini").onchange = e => { OPT.mini = e.target.checked; miniOn = OPT.mini; saveOpts(); };
+  $("oNums").onchange = e => { OPT.nums = e.target.checked; saveOpts(); };
+  $("oAuto").onchange = e => { OPT.auto = e.target.checked; saveOpts(); };
+  $("oTouch").onchange = e => { OPT.touch = e.target.value; saveOpts(); $("ovmsg").textContent = "Recarga la página para aplicar los controles"; };
+}
+
+// ---- controles táctiles ----
+const TOUCH = { fw: 0, st: 0, run: false, block: false };
+function buildTouch() {
+  if (typeof screen.appendChild !== "function") return;
+  const w = document.createElement("div"); w.id = "touch";
+  w.innerHTML = '<div id="lookpad"></div><div id="joy"><div id="knob"></div></div>' +
+    '<div class="tb" id="tAtk">⚔</div><div class="tb" id="tJump">⤒</div><div class="tb" id="tDodge">⤨</div><div class="tb" id="tUse">E</div>' +
+    '<div class="tb" id="tBlk">⛨</div><div class="tb" id="tWpn">⇄</div><div class="tb" id="tEat">♣</div><div class="tb" id="tMenu">☰</div>';
+  screen.appendChild(w);
+  const joy = $("joy"), knob = $("knob"), look = $("lookpad"); let jid = null, jcx = 0, jcy = 0, lid = null, lx = 0, ly = 0;
+  const moveJoy = e => {
+    let dx = e.clientX - jcx, dy = e.clientY - jcy; const R = 55, m = Math.hypot(dx, dy);
+    if (m > R) { dx *= R / m; dy *= R / m; }
+    knob.style.transform = "translate(" + dx + "px," + dy + "px)"; TOUCH.st = dx / R; TOUCH.fw = -dy / R; TOUCH.run = Math.hypot(dx, dy) > R * 0.92;
+  };
+  joy.addEventListener("pointerdown", e => { jid = e.pointerId; try { joy.setPointerCapture(e.pointerId); } catch (x) {} const r = joy.getBoundingClientRect(); jcx = r.left + r.width / 2; jcy = r.top + r.height / 2; moveJoy(e); e.preventDefault(); });
+  joy.addEventListener("pointermove", e => { if (e.pointerId === jid) moveJoy(e); });
+  const endJoy = e => { if (e.pointerId === jid) { jid = null; knob.style.transform = ""; TOUCH.st = 0; TOUCH.fw = 0; TOUCH.run = false; } };
+  joy.addEventListener("pointerup", endJoy); joy.addEventListener("pointercancel", endJoy);
+  look.addEventListener("pointerdown", e => { if (menuOpen) return; lid = e.pointerId; lx = e.clientX; ly = e.clientY; try { look.setPointerCapture(e.pointerId); } catch (x) {} e.preventDefault(); });
+  look.addEventListener("pointermove", e => {
+    if (e.pointerId !== lid || menuOpen) return;
+    ang += (e.clientX - lx) * 0.006 * OPT.sens; pitch = clamp(pitch - (e.clientY - ly) * 0.006 * OPT.sens * (OPT.invY ? -1 : 1), -1.35, 1.35); lx = e.clientX; ly = e.clientY;
+  });
+  const endLook = e => { if (e.pointerId === lid) lid = null; };
+  look.addEventListener("pointerup", endLook); look.addEventListener("pointercancel", endLook);
+  const hold = (id, down, up) => {
+    const b = $(id);
+    b.addEventListener("pointerdown", e => { if (menuOpen) return; down(); e.preventDefault(); e.stopPropagation(); });
+    if (up) { b.addEventListener("pointerup", e => { up(); e.preventDefault(); }); b.addEventListener("pointercancel", () => up()); b.addEventListener("pointerleave", () => up()); }
+  };
+  hold("tAtk", attackDown, attackUp);
+  hold("tJump", () => { keys[" "] = true; }, () => { keys[" "] = false; });
+  hold("tDodge", doDodge); hold("tUse", interact); hold("tEat", eatMush);
+  hold("tBlk", () => { TOUCH.block = true; }, () => { TOUCH.block = false; });
+  hold("tWpn", () => { if (P.bow) { P.wpn = P.wpn === 1 ? 2 : 1; drawInv(); } });
+  $("tMenu").addEventListener("pointerdown", e => { showMenu(); e.preventDefault(); e.stopPropagation(); });
+}
+
+function goto(level, x, y, a) {
+  setLevel(level); px = x; py = y; ang = a; pitch = 0; pz = 0; vz = 0; P.tcool = 0.9; FXL.length = 0; fadeFlash();
+  if (level.type === "cave") say("Se siente el aire frío. Algo se mueve en la oscuridad…", 3200);
+  if (OPT.auto) saveGame();
+}
+function smithTalk() {
+  const keep = (QS.cry && QS.cry.state === "active") ? QUESTS[0].need : 0, sell = INV.crystal - keep;
+  if (sell > 0) { const g = sell * 6; INV.coin += g; INV.crystal = keep; drawInv(); say("Herrero: ¡Buenos cristales! Te doy " + g + " monedas.", 3500); return; }
+  const av = OFFERS.filter(o => o.ok());
+  if (!av.length) { say("Herrero: ya tienes todo lo que vendo. ¡Ve por ese rey zombi!", 3500); return; }
+  if (offerT > 0 && offerI >= 0 && OFFERS[offerI].ok()) {
+    const o = OFFERS[offerI];
+    if (INV.coin >= o.cost) { INV.coin -= o.cost; applyOffer(o); offerI = -1; offerT = 0; drawInv(); say("Herrero: " + o.name + " lista. ¡Suerte allá abajo!", 3500); return; }
+    say("Herrero: te faltan " + (o.cost - INV.coin) + " monedas para la " + o.name + ".", 3000);
+  }
+  let k = offerI; do { k = (k + 1) % OFFERS.length; } while (!OFFERS[k].ok());
+  offerI = k; offerT = 9;
+  say("Herrero: " + OFFERS[k].name + " por " + OFFERS[k].cost + " monedas. Háblame otra vez para comprar.", 4200);
+}
+function interact() {
+  if (menuOpen || P.dead) return;
+  const t = nearInteract(); if (!t) return;
+  if (t.type === "chest") {
+    if (LV.boss && !(LV.boss.dead > 0)) { say("Un poder oscuro mantiene sellado el cofre…", 2800); return; }
+    t.open = true; P.hp = P.max; if (P.sword < 2) P.sword = 2; P.wpn = 1; INV.coin += 12; INV.arrow += 10; drawHearts(); drawInv();
+    say("¡Tesoro! Espada de hierro, 12 monedas, flechas y toda tu vida.", 4800);
+  } else if (t.smith) { smithTalk(); t.face = 1; }
+  else if (t.qid >= 0 && questTalk(t)) { t.face = 1; }
+  else { const ln = LINES[(t.line++) % LINES.length]; say(t.name + ": " + ln(), 4800); t.face = 1; }
+}
+function hurt(n) {
+  if (P.dead || n <= 0 || P.inv > 0) return;
+  P.hp = Math.max(0, P.hp - n); P.hurtT = 0.35; P.regen = 0; P.inv = 0.45; P.charging = false; P.chargeT = 0; drawHearts();
+  const h = $("hurt"); h.style.opacity = 1; setTimeout(() => { h.style.opacity = 0; }, 180);
+  const pd = $("pdmg"); pd.textContent = "-" + n; pd.style.opacity = 1; setTimeout(() => { pd.style.opacity = 0; }, 700);
+  if (P.hp <= 0) die();
+}
+function hurtP(dmg, sx, sy, kind) {
+  if (P.dead) return;
+  if (P.inv > 0) { if (dmg > 0 && P.dodgeT > 0 || (dmg > 0 && P.inv > 0.1 && P.cdDodge > 0)) spawnNum(px + Math.cos(ang) * 0.9, py + Math.sin(ang) * 0.9, EYE - 0.1, "ESQ", [150,230,255]); return; }
+  if (P.blocking && P.shield) {
+    const dx = sx - px, dy = sy - py, d = Math.hypot(dx, dy) || 1;
+    if ((dx * Math.cos(ang) + dy * Math.sin(ang)) / d > 0.2) {
+      if (P.sta >= 15) {
+        P.sta -= 15; P.staDelay = 0.9; P.blockFlash = 0.18; spawnNum(px + dx / d * 0.9, py + dy / d * 0.9, EYE - 0.1, "BLOQ", [120,200,255]);
+        dmg = kind === "slam" ? Math.max(0, dmg - 1) : 0; if (dmg <= 0) return;
+      } else { P.sta = 0; P.staDelay = 1.2; }
+    }
+  }
+  hurt(dmg);
+}
+function die() { P.dead = true; P.charging = false; document.exitPointerLock && document.exitPointerLock(); showMenu("Caíste. La oscuridad te alcanzó."); }
+function respawn() {
+  P.dead = false; P.hp = P.max; P.sta = P.staMax; P.inv = 1.2; drawHearts();
+  for (const a of WORLD.caveLevel.act) if (a.mob) a.cd = 1;
+  setLevel(WORLD); px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; pitch = 0; FXL.length = 0; fadeFlash();
+}
+function inputVec() {
+  let fw = (keys["w"] || keys["arrowup"] ? 1 : 0) - (keys["s"] || keys["arrowdown"] ? 1 : 0), st = (keys["d"] ? 1 : 0) - (keys["a"] ? 1 : 0);
+  fw += TOUCH.fw; st += TOUCH.st;
+  const m = Math.hypot(fw, st); if (m > 1) { fw /= m; st /= m; }
+  return [fw, st];
+}
+function doDodge() {
+  if (P.dead || menuOpen || P.dodgeT > 0 || P.cdDodge > 0) return;
+  if (!spend(25)) return;
+  const [fw, st] = inputVec(), dx = Math.cos(ang), dy = Math.sin(ang);
+  let vx = dx * fw - dy * st, vy = dy * fw + dx * st; const m = Math.hypot(vx, vy);
+  if (m < 0.1) { vx = -dx; vy = -dy; } else { vx /= m; vy /= m; }
+  P.ddx = vx; P.ddy = vy; P.dodgeT = 0.24; P.cdDodge = 0.7; P.inv = 0.4; P.charging = false; P.chargeT = 0;
+}
+function eatMush() { if (INV.mush > 0 && P.hp < P.max) { INV.mush--; P.hp = Math.min(P.max, P.hp + 2); drawHearts(); drawInv(); } }
+function attackDown() {
+  if (P.dead || menuOpen || P.charging || P.blocking) return;
+  if (P.wpn === 1 && P.swing >= 0) return;
+  P.charging = true; P.chargeT = 0;
+}
+function attackUp() {
+  if (!P.charging) return;
+  P.charging = false; const t = P.chargeT; P.chargeT = 0;
+  if (P.dead || menuOpen || P.blocking) return;
+  if (P.wpn === 2 && P.bow) { shoot(t); return; }
+  if (P.swing >= 0) return;
+  if (t >= 0.5 && spend(30)) P.heavy = true;
+  else if (spend(12)) P.heavy = false;
+  else return;
+  P.swing = 0; P.hitDone = false;
+}
+function shoot(t) {
+  if (P.shotCd > 0) return;
+  if (INV.arrow <= 0) { say("No te quedan flechas.", 1500); return; }
+  if (!spend(8)) return;
+  INV.arrow--; drawInv(); P.shotCd = 0.5; P.shotAnim = 0.25;
+  const q = t > 0.7 ? 3 : t > 0.3 ? 2 : 1, dx = Math.cos(ang), dy = Math.sin(ang), sp = 11 + 4.5 * q;
+  const a = add(LV, "arrow", px + dx * 0.4, py + dy * 0.4, { w: 0.5, h: 0.12, z: EYE - 0.18, sh: 0, vx: dx * sp, vy: dy * sp, vz: Math.tan(pitch) * sp, life: 2.5, from: "player", dmg: q });
+  LV.prj.push(a);
+}
+function damageMob(a, dmg, kx, ky) {
+  if (a.dead > 0) return;
+  a.hp -= dmg; a.flash = 0.22;
+  spawnNum(a.x, a.y, (a.fly ? a.z : 0) + a.h + 0.2, "-" + dmg + (dmg >= 4 ? "!" : ""), dmg >= 4 ? [255,214,80] : [255,255,255]);
+  if (kx !== undefined && !a.fly) {
+    const f = a.type === "boss" ? 0.25 : 1, nx = a.x + kx * f, ny = a.y + ky * f;
+    if (!blockedFor(nx, a.y, a, 0.22)) a.x = nx; if (!blockedFor(a.x, ny, a, 0.22)) a.y = ny;
+  }
+  if (a.type === "boss") a.aggro = true;
+  if (a.hp <= 0) {
+    a.dead = 0.001; P.kills++; dropLoot(a);
+    if (a.mid !== undefined) LV.deadM.push(a.mid);
+    onKillQuest(a);
+    if (a.type === "boss") say("¡El rey zombi cayó! El cofre ya no está sellado.", 4200);
+  }
+}
+function swordHit(heavy) {
+  const cs = Math.cos(ang), sn = Math.sin(ang), dmg = SWORDS[P.sword].dmg * (heavy ? 2 : 1) + (heavy ? 1 : 0), rg = heavy ? 2.5 : 2.0, cone = heavy ? 0.55 : 0.78, kb = heavy ? 1.2 : 0.6;
+  for (const a of LV.act) {
+    if (!a.mob || a.dead > 0 || a.hidden) continue;
+    const dx = a.x - px, dy = a.y - py, d = Math.hypot(dx, dy);
+    if (d < rg && (dx * cs + dy * sn) / (d || 1) > cone) damageMob(a, dmg, dx / (d || 1) * kb, dy / (d || 1) * kb);
+  }
+}
+function pickups() {
+  const pk = LV.picks;
+  for (let i = pk.length - 1; i >= 0; i--) {
+    const s = pk[i]; if (Math.hypot(s.x - px, s.y - py) > 0.85) continue;
+    pk.splice(i, 1); removeSprite(s);
+    if (s.pid !== undefined && s.pid < LV.pk0) LV.taken.push(s.pid);
+    let t = "+1", c = [255,214,80];
+    if (s.pick === "coin") INV.coin++; else if (s.pick === "crystal") { INV.crystal++; c = [190,160,255]; } else if (s.pick === "mush") { INV.mush++; c = [255,140,120]; } else if (s.pick === "arrow") { INV.arrow += 3; t = "+3"; c = [230,220,190]; }
+    spawnNum(s.x, s.y, 0.8, t, c); drawInv(); drawQuests();
+  }
+}
+function resetPlayer() {
+  Object.assign(P, { hp: 10, max: 10, swing: -1, dead: false, sword: 0, shield: false, bow: false, wpn: 1, kills: 0, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5,
+    sta: 100, staMax: 100, staDelay: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0 });
+  INV.coin = 0; INV.crystal = 0; INV.mush = 0; INV.arrow = 0; offerI = -1; offerT = 0;
+  for (const k in QS) delete QS[k]; FXL.length = 0;
 }
 function step(dt) {
   if (autoDay) dayT = (dayT + dt / DAY_LEN) % 1;
   weatherUpdate(dt);
-  P.tcool = Math.max(0, P.tcool - dt); P.hurtT = Math.max(0, P.hurtT - dt); P.shotCd = Math.max(0, P.shotCd - dt);
-  P.shotAnim = Math.max(0, P.shotAnim - dt); P.blockFlash = Math.max(0, P.blockFlash - dt); offerT = Math.max(0, offerT - dt);
+  P.tcool = Math.max(0, P.tcool - dt); P.hurtT = Math.max(0, P.hurtT - dt); P.shotCd = Math.max(0, P.shotCd - dt); P.inv = Math.max(0, P.inv - dt);
+  P.shotAnim = Math.max(0, P.shotAnim - dt); P.blockFlash = Math.max(0, P.blockFlash - dt); P.staFlash = Math.max(0, P.staFlash - dt); P.cdDodge = Math.max(0, P.cdDodge - dt); offerT = Math.max(0, offerT - dt);
   if (P.dead) { render(dt); return; }
-  P.blocking = !!(P.shield && (keys["k"] || mouseR));
-  const sp = 3.8 * (keys["shift"] ? 1.75 : 1) * (P.blocking ? 0.5 : 1) * dt;
-  const fw = (keys["w"] || keys["arrowup"] ? 1 : 0) - (keys["s"] || keys["arrowdown"] ? 1 : 0), st = (keys["d"] ? 1 : 0) - (keys["a"] ? 1 : 0);
+  P.blocking = !!(P.shield && (keys["k"] || mouseR || TOUCH.block) && P.sta > 0 && P.dodgeT <= 0);
+  const [fw, st] = inputVec();
+  const sprint = !!((keys["shift"] || TOUCH.run) && P.sta > 6 && (fw || st) && !P.blocking && !P.charging && P.dodgeT <= 0);
+  if (sprint) { P.sta -= 16 * dt; P.staDelay = 0.5; }
+  P.staDelay -= dt; if (P.staDelay <= 0 && !sprint) P.sta = Math.min(P.staMax, P.sta + (P.blocking ? 8 : 30) * dt);
+  P.sta = Math.max(0, P.sta);
+  if (P.charging) P.chargeT += dt;
+  const sp = 3.8 * (sprint ? 1.75 : 1) * (P.blocking ? 0.5 : 1) * (P.charging ? 0.7 : 1) * dt;
   if (keys["arrowleft"]) ang -= 2.2 * dt; if (keys["arrowright"]) ang += 2.2 * dt;
   if (keys["pageup"]) pitch = clamp(pitch + 1.5 * dt, -1.35, 1.35); if (keys["pagedown"]) pitch = clamp(pitch - 1.5 * dt, -1.35, 1.35);
   if (keys["home"]) pitch = 0;
   if (keys[" "] && pz <= 0.001) vz = 3.6;
   vz -= 11 * dt; pz = Math.max(0, pz + vz * dt); if (pz === 0 && vz < 0) vz = 0;
   const dx = Math.cos(ang), dy = Math.sin(ang);
-  const nx = px + (dx * fw - dy * st) * sp, ny = py + (dy * fw + dx * st) * sp;
-  P.moving = !!(fw || st);
-  if (P.tcool <= 0 && (fw || st)) { const tr = triggerAt(nx, ny); if (tr) { doTrigger(tr); render(dt); return; } }
+  let nx, ny, moving = !!(fw || st);
+  if (P.dodgeT > 0) { P.dodgeT -= dt; nx = px + P.ddx * 13 * dt; ny = py + P.ddy * 13 * dt; moving = true; }
+  else { nx = px + (dx * fw - dy * st) * sp; ny = py + (dy * fw + dx * st) * sp; }
+  P.moving = moving;
+  if (P.tcool <= 0 && moving) { const tr = triggerAt(nx, ny); if (tr) { doTrigger(tr); render(dt); return; } }
   if (!blockedFor(nx, py, null, 0.2)) px = nx;
   if (!blockedFor(px, ny, null, 0.2)) py = ny;
-  if (P.swing >= 0) { P.swing += dt; if (!P.hitDone && P.swing > 0.13) { P.hitDone = true; swordHit(); } if (P.swing >= SW_T) P.swing = -1; }
-  updateActors(dt); updateProjectiles(dt); updateWolves(dt); pickups();
+  if (P.swing >= 0) {
+    P.swing += dt; const T0 = P.heavy ? 0.55 : SW_T, HT = P.heavy ? 0.22 : 0.13;
+    if (!P.hitDone && P.swing > HT) { P.hitDone = true; swordHit(P.heavy); }
+    if (P.swing >= T0) { P.swing = -1; P.heavy = false; }
+  }
+  updateActors(dt); updateProjectiles(dt); updateWolves(dt); pickups(); updateMarkers(); updateFX(dt);
   if (P.hp < P.max && P.hurtT <= 0) { P.regen += dt; if (P.regen > 18) { P.regen = 0; P.hp++; drawHearts(); } }
   if (msgTimer > 0) { msgTimer -= dt; if (msgTimer <= 0) $("msg").style.opacity = 0; }
+  P.saveT = (P.saveT || 0) + dt; if (OPT.auto && P.saveT > 20) saveGame();
   const bb = LV.boss, bel = $("boss");
   if (bb && bb.aggro && !(bb.dead > 0)) { bel.style.display = "block"; $("bossf").style.width = (100 * bb.hp / bb.maxhp) + "%"; } else bel.style.display = "none";
   const it = nearInteract();
   if (it) { promptEl.style.display = "block"; promptEl.textContent = "E"; } else promptEl.style.display = "none";
+  const sbar = $("staf"), pct = Math.round(100 * P.sta / P.staMax); if (sbar._p !== pct) { sbar._p = pct; sbar.style.width = pct + "%"; }
+  $("sta").classList.toggle("flash", P.staFlash > 0);
+  const cb = $("charge"), cmax = P.wpn === 2 ? 0.8 : 0.5;
+  if (P.charging && P.chargeT > 0.15) { cb.style.display = "block"; $("chargef").style.width = Math.min(100, P.chargeT / cmax * 100) + "%"; $("chargef").style.background = P.chargeT >= cmax ? "#ffd75e" : "#9ac8ff"; } else cb.style.display = "none";
   render(dt);
 }
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  step(dt);
+  if (menuOpen) render(0); else step(dt);
   frames++; ftime += dt;
   if (ftime >= 1.5) {
     const fps = frames / ftime;
@@ -1879,42 +2198,69 @@ function loop(now) {
 }
 
 // ============================================================
+//  LOOP
+// ============================================================
+let WORLD = null, last = 0, frames = 0, ftime = 0, mouseR = false;
+const fpsEl = $("fps"), posEl = $("pos"), overlay = $("overlay"), promptEl = $("prompt");
+function newWorld(seed) {
+  let w = null, s = seed;
+  for (let i = 0; i < 25 && !w; i++, s++) w = genOverworld(s);
+  WORLD = w; SEED = s; setLevel(WORLD); resetPlayer();
+  px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; pitch = 0; drawHearts(); drawInv();
+}
+
+// ============================================================
 //  INPUT
 // ============================================================
 addEventListener("keydown", e => {
-  const k = e.key.toLowerCase(); keys[k] = true;
-  if (k === "-") { FONT = Math.max(8, FONT - 1); fit(); }
-  if (k === "=" || k === "+") { FONT = Math.min(18, FONT + 1); fit(); }
+  const k = e.key.toLowerCase();
+  if (k === "escape") { if (!locked && !touchPlaying && !menuOpen) showMenu(); return; }
+  if (menuOpen) return;
+  keys[k] = true;
+  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown", "home"].includes(k)) e.preventDefault();
+  if (e.repeat) return;
+  if (k === "-") { OPT.font = Math.max(8, OPT.font - 1); FONT = OPT.font; fit(); saveOpts(); }
+  if (k === "=" || k === "+") { OPT.font = Math.min(18, OPT.font + 1); FONT = OPT.font; fit(); saveOpts(); }
   if (k === "n") { dayT = (dayT + 0.12) % 1; autoDay = false; }
   if (k === "h") autoDay = !autoDay;
-  if (k === "m") miniOn = !miniOn;
+  if (k === "m") { OPT.mini = !OPT.mini; miniOn = OPT.mini; saveOpts(); }
   if (k === "c") { const i = WNAMES.indexOf(W.name); setWeather(WNAMES[(i + 1) % WNAMES.length]); say("Clima: " + ({ clear: "despejado", cloudy: "nublado", rain: "lluvia", storm: "tormenta", fog: "niebla", snow: "nieve" })[W.name], 1800); }
-  if (k === "g") newWorld(Math.floor(Math.random() * 99999) + 1);
   if (k === "e") interact();
-  if (k === "j") attack();
+  if (k === "j") attackDown();
+  if (k === "x") doDodge();
   if (k === "1") { P.wpn = 1; drawInv(); }
   if (k === "2" && P.bow) { P.wpn = 2; drawInv(); }
-  if (k === "q" && INV.mush > 0 && P.hp < P.max) { INV.mush--; P.hp = Math.min(P.max, P.hp + 2); drawHearts(); drawInv(); }
+  if (k === "q") eatMush();
   if (k === "f") { const s = $("scan"); s.style.display = s.style.display === "block" ? "none" : "block"; }
-  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown", "home"].includes(k)) e.preventDefault();
 });
-addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
-addEventListener("blur", () => { keys = {}; mouseR = false; });
-overlay.addEventListener("click", () => { if (P.dead) respawn(); try { screen.requestPointerLock(); } catch (e) { overlay.classList.add("hidden"); } });
+addEventListener("keyup", e => { const k = e.key.toLowerCase(); keys[k] = false; if (k === "j") attackUp(); });
+addEventListener("blur", () => { keys = {}; mouseR = false; if (P.charging) { P.charging = false; P.chargeT = 0; } });
+overlay.addEventListener("click", e => { const b = e.target && e.target.closest ? e.target.closest("button,input,label,select") : null; if (!b) play(); });
 screen.addEventListener("mousedown", e => {
+  if (menuOpen) return;
   if (e.button === 2) { mouseR = true; return; }
-  if (locked) attack(); else if (!P.dead) { try { screen.requestPointerLock(); } catch (e2) {} }
+  if (locked) attackDown(); else if (!touchPlaying && !P.dead) { try { screen.requestPointerLock(); } catch (e2) {} }
 });
-addEventListener("mouseup", e => { if (e.button === 2) mouseR = false; });
+addEventListener("mouseup", e => { if (e.button === 2) mouseR = false; else if (e.button === 0) attackUp(); });
 addEventListener("contextmenu", e => e.preventDefault());
-document.addEventListener("pointerlockchange", () => { locked = document.pointerLockElement === screen; overlay.classList.toggle("hidden", locked); });
-document.addEventListener("pointerlockerror", () => overlay.classList.add("hidden"));
-document.addEventListener("mousemove", e => { if (locked || (e.buttons & 1)) { ang += e.movementX * 0.0026; pitch = clamp(pitch - e.movementY * 0.0026, -1.35, 1.35); } });
+document.addEventListener("pointerlockchange", () => {
+  locked = document.pointerLockElement === screen;
+  if (locked) { overlay.classList.add("hidden"); menuOpen = false; } else if (!touchPlaying && !menuOpen) showMenu();
+});
+document.addEventListener("pointerlockerror", () => { overlay.classList.add("hidden"); menuOpen = false; });
+document.addEventListener("mousemove", e => {
+  if (!menuOpen && (locked || (e.buttons & 1))) { ang += e.movementX * 0.0026 * OPT.sens; pitch = clamp(pitch - e.movementY * 0.0026 * OPT.sens * (OPT.invY ? -1 : 1), -1.35, 1.35); }
+});
+addEventListener("beforeunload", () => { if (OPT.auto) saveGame(); });
 setTimeout(() => { $("toast").style.opacity = 0; }, 8000);
 
-const QS = (typeof location !== "undefined" && location.search) || "", mSeed = /seed=(\d+)/.exec(QS);
-newWorld(mSeed ? parseInt(mSeed[1]) : Math.floor(Math.random() * 99999) + 1);
+const QS_ = (typeof location !== "undefined" && location.search) || "", mSeed = /seed=(\d+)/.exec(QS_);
+applyOpts(); bindMenu();
+let loaded = false;
+if (mSeed) newWorld(parseInt(mSeed[1])); else { loaded = loadGame(); if (!loaded) newWorld(Math.floor(Math.random() * 99999) + 1); }
+if (isTouch()) buildTouch();
 fit(); setTimeout(fit, 60);
+showMenu(loaded ? "Partida cargada" : "");
 requestAnimationFrame(t => { last = t; loop(t); });
 </script>
 </body>

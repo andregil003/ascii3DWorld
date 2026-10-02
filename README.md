@@ -8,6 +8,7 @@ Historial en este repo:
 - `v4 — pueblito` (commit previo, desde `Downloads/index.html`)
 - `v5` (desde `Downloads/index (1).html`, copiado byte-por-byte como `index.html`)
 - `v5 update 2026-10-01` (desde `Downloads/index (2).html`, copiado byte-por-byte como `index.html`, +23KB / +355 líneas)
+- `v5 update-2 2026-10-01` (desde `Downloads/index (3).html`, copiado byte-por-byte como `index.html`, +24KB)
 
 ## Controles (v5)
 
