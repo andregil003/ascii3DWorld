@@ -15,7 +15,7 @@
   #topbar b { letter-spacing: 2px; }
   #screen { flex: 1; position: relative; overflow: hidden; cursor: crosshair; background: #05080a;
     display: flex; align-items: center; justify-content: center; }
-  #cv { display: block; }
+  #cv { display: block; image-rendering: pixelated; }
   #scan { position: absolute; inset: 0; pointer-events: none; z-index: 3; opacity: .12; display: none;
     background: repeating-linear-gradient(0deg, #000 0 1px, transparent 1px 3px); }
   #cross { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
@@ -81,6 +81,13 @@
   #tJump { right: 27vmin; bottom: 5vmin; } #tDodge { right: 26vmin; bottom: 21vmin; } #tUse { right: 5vmin; bottom: 33vmin; }
   #tBlk { right: 43vmin; bottom: 8vmin; } #tWpn { right: 43vmin; bottom: 24vmin; } #tEat { right: 22vmin; bottom: 37vmin; width: 11vmin; height: 11vmin; }
   #tMenu { left: calc(50% - 4.5vmin); top: 1vmin; width: 9vmin; height: 9vmin; font-size: 5vmin; }
+  #party { position: absolute; left: 14px; top: 44%; z-index: 4; font-size: 12px; color: #cfe6ff; text-shadow: 0 0 3px #000; pointer-events: none; }
+  #party .pb { width: 110px; height: 6px; border: 1px solid rgba(255,255,255,.4); background: rgba(0,0,0,.5); margin: 2px 0 6px; }
+  #party .pb div { height: 100%; background: linear-gradient(90deg,#3a7be0,#7fb8ff); }
+  #party .pc { opacity: .75; font-size: 11px; }
+  #chat { position: absolute; left: 14px; bottom: 54px; z-index: 4; font-size: 13px; padding: 4px 10px; border-radius: 6px; background: rgba(8,16,28,.75);
+    color: #cfe6ff; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #tCmd { right: 5vmin; bottom: 49vmin; width: 11vmin; height: 11vmin; }
   #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,.84); color: #d8ffd8; font-size: 14px; line-height: 1.8;
     text-align: center; cursor: pointer; z-index: 6; padding: 20px; }
@@ -100,6 +107,8 @@
     <div id="pdmg"></div>
     <div id="charge"><div id="chargef"></div></div>
     <div id="note"></div>
+    <div id="party"></div>
+    <div id="chat"></div>
     <div id="inv"></div>
     <div id="boss"><div id="bossf"></div></div>
     <div id="hurt"></div>
@@ -108,7 +117,7 @@
     <div id="cross">+</div>
     <div id="prompt"></div>
     <div id="msg"></div>
-    <div id="toast">WASD · mouse · click atacar (mantén = golpe fuerte) · X esquivar · K escudo · E hablar · Esc menú</div>
+    <div id="toast">WASD · mouse · click atacar (mantén = golpe fuerte) · X esquivar · K escudo · E usar · Esc menú</div>
     <div id="overlay"><div id="ovtext">
       <div class="big">ASCII-FPS v5</div>
       <div id="ovmsg"></div>
@@ -121,7 +130,10 @@
       </div>
       <div id="opts" style="display:none">
         <label>Sensibilidad <input type="range" id="oSens" min="30" max="250"></label>
-        <label>Tamaño del texto <input type="range" id="oFont" min="8" max="18"></label>
+        <label>Estilo visual <select id="oStyle"><option value="pixel">Píxel</option><option value="ascii">ASCII</option></select></label>
+        <label>Tamaño del píxel <input type="range" id="oPx" min="2" max="10"></label>
+        <label>Dithering retro <input type="checkbox" id="oDith"></label>
+        <label>Tamaño del texto (ASCII) <input type="range" id="oFont" min="8" max="18"></label>
         <label>Campo de visión <input type="range" id="oFov" min="60" max="100"></label>
         <label>Invertir eje Y <input type="checkbox" id="oInv"></label>
         <label>Minimapa <input type="checkbox" id="oMini"></label>
@@ -132,7 +144,7 @@
       <div id="help">
         WASD moverse · SHIFT correr · ESPACIO saltar · X esquivar · mouse mirar (RePág/AvPág también)<br>
         CLICK/J atacar (mantén ~medio segundo y suelta = golpe fuerte; con arco, mantén para tensar) · K o click derecho: escudo<br>
-        1 espada · 2 arco · Q comer hongo · E hablar/abrir · N hora · H pausa el tiempo · C clima · M minimapa · Esc menú
+        1 espada · 2 arco · 3 bastón · Q comer hongo · E hablar/abrir/bote/reclutar · T órdenes a los peones · N hora · H pausa el tiempo · C clima · M minimapa · Esc menú
       </div>
     </div></div>
   </div>
@@ -167,14 +179,14 @@ const $ = id => document.getElementById(id);
 //          'M' montaña · 'C' boca de cueva · 'I' pared interior · 'w' ventana interior
 //          'X' salida · 'R' roca de cueva
 // ============================================================
-const SOLID = "HWDKh~MCIwXR";
-const WALLS = "HWDKhMC";
+const SOLID = "HWDKh~MCIwXRNYGZSU";
+const WALLS = "HWDKhMCNYGZ";
 let LV, grid, fgrid, hid, MW, MH, SPR, LAMPS, HG, OUT = "~";
 function newLevel(type, W, H, fill) {
   const g = [], f = [], h = [];
   for (let y = 0; y < H; y++) { g.push(new Array(W).fill(fill || ".")); f.push(new Array(W).fill("grass")); h.push(new Array(W).fill(-1)); }
   return { type, W, H, grid: g, fgrid: f, hid: h, hg: new Float32Array(W * H), spr: [], lamps: [], act: [], obst: [], ceil: 1.9,
-    houses: [], walk: [], spawn: { x: 2, y: 2, ang: 0 }, cg: null, mm: null, ret: null, picks: [], prj: [], taken: [], deadM: [], pk: 0, pk0: 1e9 };
+    houses: [], walk: [], spawn: { x: 2, y: 2, ang: 0 }, cg: null, mm: null, ret: null, picks: [], prj: [], taken: [], deadM: [], pk: 0, pk0: 1e9, chests: [], bio: null, mine: 0, magic: false, cacti: [] };
 }
 function setLevel(l) {
   LV = l; grid = l.grid; fgrid = l.fgrid; hid = l.hid; MW = l.W; MH = l.H; SPR = l.spr; LAMPS = l.lamps; HG = l.hg;
@@ -191,7 +203,9 @@ function tileH(t, mx, my) {
     case "H": case "W": case "D": return 2.5;
     case "K": return 4.8;
     case "h": return 0.7;
-    case "M": case "C": return HG[my * MW + mx];
+    case "M": case "C": case "N": case "Z": return HG[my * MW + mx];
+    case "Y": case "G": return 5.0;
+    case "S": case "U": return LV.ceil;
     case "I": case "w": case "X": case "R": return LV.ceil;
   }
   return 0;
@@ -247,30 +261,76 @@ function bfs(Lv, sx, sy) {
   return { dist, par };
 }
 
+
+function mkVillager(R, k, o) {
+  return Object.assign({ actor: true, w: 0.5, h: 1.05, r: 0.24, skin: SKINS[Math.floor(R() * 4)], shirt: SHIRTS[Math.floor(R() * SHIRTS.length)],
+    pants: [70 + R() * 50 | 0, 60 + R() * 40 | 0, 50 + R() * 40 | 0], hair: HAIRS[Math.floor(R() * HAIRS.length)],
+    hat: R() < 0.4 ? [216, 184, 96] : null, beard: R() < 0.25, phase: R() * 6, moving: false, tx: 0, ty: 0, wait: R() * 3, stuck: 0,
+    name: NAMES[k % NAMES.length], line: Math.floor(R() * 100), sh: 0.4 }, o);
+}
+
+function buildCasters(Lv) {
+  const RES = 4, CW = Lv.W * RES, CH = Lv.H * RES;
+  const cg = new Float32Array(CW * CH);
+  for (const s of Lv.spr) {
+    if (!["oak", "pine", "birch", "palm", "swamptree", "cactus"].includes(s.type)) continue;
+    const r = s.type === "pine" ? 0.7 : (s.type === "palm" ? 0.5 : (s.type === "cactus" ? 0.35 : 1.0)), h = s.type === "pine" ? 3.4 : (s.type === "cactus" ? 2.0 : 3.0);
+    for (let fy = Math.floor((s.y - r) * RES); fy <= Math.floor((s.y + r) * RES); fy++)
+      for (let fx = Math.floor((s.x - r) * RES); fx <= Math.floor((s.x + r) * RES); fx++) {
+        if (fx < 0 || fy < 0 || fx >= CW || fy >= CH) continue;
+        const dx = (fx + 0.5) / RES - s.x, dy = (fy + 0.5) / RES - s.y;
+        if (dx * dx + dy * dy < r * r) cg[fy * CW + fx] = Math.max(cg[fy * CW + fx], h);
+      }
+  }
+  Lv.cg = cg; Lv.cgW = CW;
+}
+
+function biomeAt(x, y) {
+  const b = LV && LV.bio; if (!b) return 0;
+  const ix = Math.floor(x), iy = Math.floor(y);
+  if (ix < 0 || iy < 0 || ix >= MW || iy >= MH) return 0;
+  return b[iy * MW + ix];
+}
 function genOverworld(seed) {
   SEED = seed;
-  const R = rng(seed * 7919 + 13), W = 96, H = 96, Lv = newLevel("over", W, H);
+  const R = rng(seed * 7919 + 13), W = 150, H = 150, Lv = newLevel("over", W, H);
   Lv.ceil = 0;
-  const vx = 32, vy = 37, cx = W / 2, cy = H / 2;
-  const a0 = R() * Math.PI * 2, mcx = cx + Math.cos(a0) * 27, mcy = cy + Math.sin(a0) * 27;
+  const cx = W / 2, cy = H / 2, vx = (W >> 1) - 16, vy = (H >> 1) - 11;
+  const a0 = R() * Math.PI * 2, mcx = cx + Math.cos(a0) * 27, mcy = cy + Math.sin(a0) * 27, a1 = R() * Math.PI * 2;
+  const isl = [], ib = a0 + 2.3 + R() * 0.5;
+  for (let k = 0; k < 3; k++) { const ak = ib + k * 2.09 + (R() - 0.5) * 0.35, dk = 56 + R() * 4; isl.push({ x: cx + Math.cos(ak) * dk, y: cy + Math.sin(ak) * dk, r: 8.5 + R() * 2.5, bio: k === 0 ? 1 : k === 1 ? 2 : 0 }); }
   const e = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const dx = (x - cx) / (W * 0.47), dy = (y - cy) / (H * 0.47), d = Math.hypot(dx, dy);
+    const d = Math.hypot(x - cx, y - cy) / 45;
     let v = fbm(x / 13, y / 13) * 0.5 + clamp(1 - Math.pow(d, 2.2), 0, 1) * 0.85 - 0.06;
     const vdx = Math.max(vx - 4 - x, 0, x - (vx + 36)), vdy = Math.max(vy - 4 - y, 0, y - (vy + 26));
     v = Math.max(v, 0.56 - Math.hypot(vdx, vdy) * 0.05);
     const md = Math.hypot(x - mcx, y - mcy);
     v += 0.75 * Math.exp(-(md * md) / 85);
+    for (const q of isl) { const dk = Math.hypot(x - q.x, y - q.y); v = Math.max(v, 0.98 - dk / q.r * 0.78 + (fbm(x / 6 + 31, y / 6 + 17) - 0.5) * 0.5); }
     e[y * W + x] = v;
   }
+  const bio = Lv.bio = new Uint8Array(W * H);
+  const biomeOf = (x, y) => {
+    for (const q of isl) if (Math.hypot(x - q.x, y - q.y) < q.r * 1.8) return q.bio;
+    if (Math.hypot(x - cx, y - cy) < 25) return 0;
+    const an = Math.atan2(y - cy, x - cx) + (fbm(x / 15 + 11, y / 15 + 11) - 0.5) * 1.4;
+    const sec = Math.floor((((an - a1) / (Math.PI * 2)) % 1 + 1) % 1 * 4);
+    return sec === 0 ? 1 : sec === 1 ? 2 : sec === 2 ? 3 : 0;
+  };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const v = e[y * W + x], md = Math.hypot(x - mcx, y - mcy);
+    const v = e[y * W + x], md = Math.hypot(x - mcx, y - mcy), b = biomeOf(x, y); bio[y * W + x] = b;
     if (v < 0.34) Lv.grid[y][x] = "~";
     else if (v > 0.98 && md < 15) { Lv.grid[y][x] = "M"; Lv.hg[y * W + x] = clamp(1.9 + (v - 0.98) * 2.6 + vn(x * 0.7, y * 0.7) * 0.9, 1.8, 3.4) * 1.25; }
-    else Lv.fgrid[y][x] = v < 0.42 ? "sand" : "grass";
+    else {
+      let f = "grass";
+      if (b === 1) f = "dune"; else if (b === 2) f = "snow"; else if (b === 3) f = fbm(x / 4 + 70, y / 4 + 70) > 0.6 ? "bog" : "swamp";
+      if (v < 0.42 && b !== 1 && b !== 2) f = "sand";
+      Lv.fgrid[y][x] = f;
+    }
   }
   // ---- aldea ----
-  for (let y = vy - 1; y <= vy + 23; y++) for (let x = vx - 1; x <= vx + 33; x++) { Lv.grid[y][x] = "."; Lv.fgrid[y][x] = "grass"; }
+  for (let y = vy - 1; y <= vy + 23; y++) for (let x = vx - 1; x <= vx + 33; x++) { Lv.grid[y][x] = "."; Lv.fgrid[y][x] = "grass"; bio[y * W + x] = 0; }
   HT.forEach((t, i) => {
     const h = Object.assign({ x: vx + t.x, y: vy + t.y, w: t.w, h: t.h, id: i }, PALS[i]);
     Lv.houses.push(h); stampHouse(Lv, h);
@@ -284,7 +344,7 @@ function genOverworld(seed) {
   pathH(18, 6, 10);
   for (let x = 2; x <= 8; x++) Lv.grid[vy + 8][vx + x] = "h";
   for (let x = 13; x <= 18; x++) Lv.grid[vy + 14][vx + x] = "h";
-  for (let y = 0; y < 22; y++) for (let x = 0; x < 32; x++) {                   // estanque
+  for (let y = 0; y < 22; y++) for (let x = 0; x < 32; x++) {
     const dx = (x - 24) / 5, dy = (y - 16.5) / 2.8;
     if (dx * dx + dy * dy < 1 && Lv.grid[vy + y][vx + x] === ".") Lv.grid[vy + y][vx + x] = "~";
   }
@@ -308,9 +368,32 @@ function genOverworld(seed) {
   add(Lv, "spire", vx + 16, vy + 5, { w: 2.1, h: 2.2, z: 4.8 });
   Lv.houses.forEach(h => add(Lv, "chimney", h.x + 1.5, h.y + 1.5, { w: 0.9, h: 1.4, z: 2.5, sh: 0 }));
   for (let y = vy; y < vy + 22; y++) for (let x = vx; x < vx + 32; x++) if (["path", "plaza"].includes(Lv.fgrid[y][x]) && Lv.grid[y][x] === ".") Lv.walk.push([x + 0.5, y + 0.5]);
-  // ---- alcanzabilidad + cueva ----
-  const sx = vx + 16, sy = vy + 12;
-  const B = bfs(Lv, sx, sy);
+  const inVill = (x, y) => x >= vx - 2 && x <= vx + 34 && y >= vy - 2 && y <= vy + 24;
+  Lv.noVeg = [];
+  const noveg = (x0, y0, x1, y1) => Lv.noVeg.push({ x0, y0, x1, y1 });
+  const inNoVeg = (x, y) => Lv.noVeg.some(b => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+  // ---- alcanzabilidad ----
+  const sx = vx + 16, sy = vy + 12, B = bfs(Lv, sx, sy);
+  const markPath = (tx, ty) => { let c = ty * W + tx; while (c >= 0) { const qx = c % W, qy = (c / W) | 0; if (Lv.grid[qy][qx] === ".") Lv.fgrid[qy][qx] = Lv.fgrid[qy][qx] === "plaza" ? "plaza" : "path"; c = B.par[c]; } };
+  // ---- puerto y barco ----
+  let hb = null, hbd = 1e9;
+  for (let y = 3; y < H - 3; y++) for (let x = 3; x < W - 3; x++) {
+    if (B.dist[y * W + x] < 0 || Lv.fgrid[y][x] !== "sand") continue;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      let ok = true;
+      for (let i = 1; i <= 6; i++) { const tx = x + dx * i, ty = y + dy * i; if (tx < 1 || ty < 1 || tx >= W - 1 || ty >= H - 1 || Lv.grid[ty][tx] !== "~") { ok = false; break; } }
+      if (!ok) continue;
+      const d2 = Math.hypot(x - (vx + 16), y - (vy + 11)); if (d2 < hbd) { hbd = d2; hb = { x, y, dx, dy }; }
+    }
+  }
+  if (!hb) return null;
+  markPath(hb.x, hb.y);
+  for (let i = 1; i <= 3; i++) { const tx = hb.x + hb.dx * i, ty = hb.y + hb.dy * i; Lv.grid[ty][tx] = "."; Lv.fgrid[ty][tx] = "dock"; }
+  Lv.harbor = { x: hb.x, y: hb.y, dx: hb.dx, dy: hb.dy };
+  { const lx = hb.x + 0.5 - hb.dy * 1.0, ly = hb.y + 0.5 + hb.dx * 1.0; add(Lv, "lamp", lx, ly, { w: 0.55, h: 2.3, r: 0.13 }); Lv.lamps.push([lx, ly]); }
+  Lv.boat = add(Lv, "boat", hb.x + hb.dx * 4 + 0.5, hb.y + hb.dy * 4 + 0.5, { w: 2.6, h: 2.2, sh: 0 });
+  noveg(hb.x - 3, hb.y - 3, hb.x + 3, hb.y + 3);
+  // ---- cueva y mina ----
   const cands = [];
   for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
     if (Lv.grid[y][x] !== "M") continue;
@@ -323,27 +406,99 @@ function genOverworld(seed) {
       cands.push({ x, y, dx, dy, d: B.dist[ny * W + nx] });
     }
   }
-  if (!cands.length) return null;
+  if (cands.length < 2) return null;
   cands.sort((a, b) => b.d - a.d);
   const cd = cands[Math.floor(R() * Math.min(cands.length, Math.max(3, cands.length * 0.3)))];
-  Lv.grid[cd.y][cd.x] = "C"; Lv.hg[cd.y * W + cd.x] = 3.2;
-  Lv.caveDoor = { x: cd.x, y: cd.y, outX: cd.x + cd.dx + 0.5, outY: cd.y + cd.dy + 0.5, ang: Math.atan2(cd.dy, cd.dx) };
-  let c = (cd.y + cd.dy) * W + (cd.x + cd.dx);                                   // camino desde la cueva hasta la plaza
-  while (c >= 0) { const px2 = c % W, py2 = (c / W) | 0; if (Lv.grid[py2][px2] === ".") Lv.fgrid[py2][px2] = Lv.fgrid[py2][px2] === "plaza" ? "plaza" : "path"; c = B.par[c]; }
-  const tx0 = cd.x + cd.dx + 0.5, ty0 = cd.y + cd.dy + 0.5, ppx = -cd.dy, ppy = cd.dx;
-  for (const sg of [-1, 1]) {
-    const lx = tx0 + ppx * 0.42 * sg - cd.dx * 0.2, ly = ty0 + ppy * 0.42 * sg - cd.dy * 0.2;
-    add(Lv, "torch", lx, ly, { w: 0.45, h: 0.8, z: 0.9, sh: 0 }); Lv.lamps.push([lx, ly]);
+  let far2 = cands.filter(c => Math.hypot(c.x - cd.x, c.y - cd.y) >= 14); if (!far2.length) far2 = cands.filter(c => Math.hypot(c.x - cd.x, c.y - cd.y) >= 6);
+  if (!far2.length) return null;
+  const md2 = far2[Math.floor(R() * far2.length)];
+  const doors = [];
+  for (const [c, tch, nm] of [[cd, "C", "caveDoor"], [md2, "N", "mineDoor"]]) {
+    Lv.grid[c.y][c.x] = tch; Lv.hg[c.y * W + c.x] = 3.2;
+    Lv[nm] = { x: c.x, y: c.y, outX: c.x + c.dx + 0.5, outY: c.y + c.dy + 0.5, ang: Math.atan2(c.dy, c.dx) };
+    markPath(c.x + c.dx, c.y + c.dy);
+    const tx0 = c.x + c.dx + 0.5, ty0 = c.y + c.dy + 0.5, ppx = -c.dy, ppy = c.dx;
+    for (const sg of [-1, 1]) {
+      const lx = tx0 + ppx * 0.42 * sg - c.dx * 0.2, ly = ty0 + ppy * 0.42 * sg - c.dy * 0.2;
+      add(Lv, "torch", lx, ly, { w: 0.45, h: 0.8, z: 0.9, sh: 0 }); Lv.lamps.push([lx, ly]);
+    }
+    noveg(c.x + c.dx - 2, c.y + c.dy - 2, c.x + c.dx + 2, c.y + c.dy + 2);
   }
-  // ---- vegetación y rocas ----
+  // ---- islotes: ruinas / torre del mago / tesoro ----
+  const rnd = q => ({ x: Math.round(q.x), y: Math.round(q.y) });
+  { // ruinas en el desierto
+    const c0 = rnd(isl[0]), x0 = c0.x - 4, y0 = c0.y - 3, x1 = x0 + 8, y1 = y0 + 6;
+    for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) { Lv.grid[y][x] = "."; Lv.fgrid[y][x] = "dune"; bio[y * W + x] = 1; }
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) Lv.fgrid[y][x] = "ruin";
+    const edge = [];
+    for (let x = x0; x <= x1; x++) { edge.push([x, y0]); edge.push([x, y1]); }
+    for (let y = y0 + 1; y < y1; y++) { edge.push([x0, y]); edge.push([x1, y]); }
+    for (const [x, y] of edge) {
+      const corner = (x === x0 || x === x1) && (y === y0 || y === y1);
+      if (corner || R() < 0.72) { Lv.grid[y][x] = "Z"; Lv.hg[y * W + x] = 0.9 + R() * 1.9; }
+    }
+    Lv.grid[y0][x0 + 4] = "."; Lv.grid[y1][x0 + 4] = ".";
+    [[2, 1], [6, 1], [2, 5], [6, 5], [2, 3], [6, 3]].forEach(([px3, py3], k) => add(Lv, "pillar", x0 + px3 + 0.5, y0 + py3 + 0.5, { w: 0.8, h: 2.4, r: 0.3, broken: R() < 0.5, seed: 7 + k }));
+    const ch = add(Lv, "chest", x0 + 4.5, y0 + 3.5, { w: 0.95, h: 0.62, r: 0.35, open: false, loot: "ruins" }); Lv.chests.push(ch);
+    for (let k = 0; k < 7; k++) { const a = k * 0.9 + R(), rr = 7.5 + R() * 2.5, px3 = x0 + 4.5 + Math.cos(a) * rr, py3 = y0 + 3.5 + Math.sin(a) * rr; if (Lv.grid[Math.floor(py3)]?.[Math.floor(px3)] === ".") add(Lv, "palm", px3, py3, { w: 2.3, h: 3.8, r: 0.2 }); }
+    Lv.ruinsGuards = [["skeleton", x0 + 2.5, y0 + 3.5, 1001], ["skeleton", x0 + 6.5, y0 + 3.5, 1002], ["zombie", x0 + 4.5, y0 + 1.6, 1003]];
+    noveg(x0 - 3, y0 - 3, x1 + 3, y1 + 3);
+  }
+  { // torre del mago en la tundra
+    const c1 = rnd(isl[1]), x0 = c1.x - 1, y0 = c1.y - 1;
+    for (let y = y0 - 2; y <= y0 + 4; y++) for (let x = x0 - 2; x <= x0 + 4; x++) { Lv.grid[y][x] = "."; Lv.fgrid[y][x] = "snow"; bio[y * W + x] = 2; }
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) Lv.grid[y0 + y][x0 + x] = "Y";
+    Lv.grid[y0 + 2][x0 + 1] = "G";
+    Lv.mtower = { x: x0, y: y0, outX: x0 + 1.5, outY: y0 + 3.5 };
+    add(Lv, "spire", x0 + 1.5, y0 + 1.5, { w: 3.4, h: 2.8, z: 5.0, col: [120,70,190], sh: 0 });
+    add(Lv, "crystal", x0 + 1.5, y0 + 1.5, { w: 0.7, h: 1.1, z: 7.9, sh: 0 });
+    for (const sg of [-1, 1]) { const lx = x0 + 1.5 + sg * 1.2, ly = y0 + 3.4; add(Lv, "torch", lx, ly, { w: 0.45, h: 0.8, z: 0.9, sh: 0 }); Lv.lamps.push([lx, ly]); }
+    noveg(x0 - 3, y0 - 3, x0 + 5, y0 + 5);
+  }
+  { // tesoro enterrado
+    const c2 = rnd(isl[2]);
+    for (let y = c2.y - 2; y <= c2.y + 2; y++) for (let x = c2.x - 2; x <= c2.x + 2; x++) { Lv.grid[y][x] = "."; Lv.fgrid[y][x] = "sand"; }
+    const ch = add(Lv, "chest", c2.x + 0.5, c2.y + 0.5, { w: 0.95, h: 0.62, r: 0.35, open: false, loot: "island" }); Lv.chests.push(ch);
+    for (let k = 0; k < 6; k++) { const a = k * 1.05 + R(), rr = 2.6 + R() * 1.4; add(Lv, "palm", c2.x + 0.5 + Math.cos(a) * rr, c2.y + 0.5 + Math.sin(a) * rr, { w: 2.3, h: 3.8, r: 0.2 }); }
+    add(Lv, "rock", c2.x + 1.8, c2.y - 1.2, { w: 0.9, h: 0.6, r: 0.3 });
+    noveg(c2.x - 3, c2.y - 3, c2.x + 3, c2.y + 3);
+  }
+  // ---- oasis en el desierto ----
+  for (let k = 0, placed = 0; k < 400 && placed < 2; k++) {
+    const x = 6 + Math.floor(R() * (W - 12)), y = 6 + Math.floor(R() * (H - 12));
+    if (bio[y * W + x] !== 1 || Math.hypot(x - cx, y - cy) < 30 || inNoVeg(x, y)) continue;
+    let ok = true;
+    for (let dy = -4; dy <= 4 && ok; dy++) for (let dx = -4; dx <= 4; dx++) { if (Lv.grid[y + dy][x + dx] !== "." || Lv.fgrid[y + dy][x + dx] !== "dune") { ok = false; break; } }
+    if (!ok) continue;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      if (dx * dx / 4.8 + dy * dy / 2.9 < 1) { Lv.grid[y + dy][x + dx] = "~"; }
+      else if (dx * dx / 10 + dy * dy / 6.5 < 1) Lv.fgrid[y + dy][x + dx] = "grass";
+    }
+    for (let q = 0; q < 5; q++) { const a = q * 1.26 + R() * 0.4; add(Lv, "palm", x + 0.5 + Math.cos(a) * 3.3, y + 0.5 + Math.sin(a) * 2.5, { w: 2.3, h: 3.8, r: 0.2 }); }
+    noveg(x - 5, y - 5, x + 5, y + 5); placed++;
+  }
+  // ---- vegetación por bioma ----
+  const cdoors = [Lv.caveDoor, Lv.mineDoor];
   for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-    if (x >= vx - 2 && x <= vx + 34 && y >= vy - 2 && y <= vy + 24) continue;
-    if (!okTile(x, y)) continue;
-    const ft = Lv.fgrid[y][x], v = e[y * W + x], forest = fbm(x / 8 + 50, y / 8 + 50), r = R();
-    if (Math.abs(x + 0.5 - tx0) < 2 && Math.abs(y + 0.5 - ty0) < 2) continue;
+    if (inVill(x, y) || !okTile(x, y) || inNoVeg(x, y)) continue;
+    const ft = Lv.fgrid[y][x], v = e[y * W + x], b = bio[y * W + x], forest = fbm(x / 8 + 50, y / 8 + 50), r = R();
+    if (cdoors.some(c => Math.abs(x + 0.5 - c.outX) < 2 && Math.abs(y + 0.5 - c.outY) < 2)) continue;
     const jx = x + 0.5 + (R() - 0.5) * 0.6, jy = y + 0.5 + (R() - 0.5) * 0.6;
     if (ft === "sand") { if (r < 0.05) add(Lv, "palm", jx, jy, { w: 2.3, h: 3.8, r: 0.2 }); else if (r < 0.065) add(Lv, "rock", jx, jy, { w: 0.9, h: 0.6, r: 0.3 }); continue; }
-    if (forest > 0.56 ? r < 0.36 : r < 0.035) {
+    if (b === 1) {
+      if (r < 0.028) add(Lv, "cactus", jx, jy, { w: 1.1, h: 2.0, r: 0.28 });
+      else if (r < 0.04) add(Lv, "deadtree", jx, jy, { w: 1.8, h: 2.6, r: 0.25 });
+      else if (r < 0.058) add(Lv, "rock", jx, jy, { w: 0.9, h: 0.6, r: 0.3 });
+    } else if (b === 2) {
+      if (forest > 0.58 ? r < 0.24 : r < 0.03) add(Lv, "pine", jx, jy, { w: 1.6, h: 3.8, r: 0.28, snowy: true });
+      else if (r > 0.975) add(Lv, "rock", jx, jy, { w: 0.9, h: 0.6, r: 0.3 });
+      else if (r > 0.96) add(Lv, "deadtree", jx, jy, { w: 1.8, h: 2.6, r: 0.25, snowy: true });
+    } else if (b === 3) {
+      if (ft === "bog") { if (r < 0.09) add(Lv, "lily", jx, jy, { w: 1.0, h: 0.3, sh: 0 }); }
+      else if (forest > 0.5 ? r < 0.2 : r < 0.05) add(Lv, "swamptree", jx, jy, { w: 2.4, h: 3.0, r: 0.3 });
+      else if (r > 0.9) add(Lv, "reeds", jx, jy, { w: 0.9, h: 1.3, sh: 0 });
+      else if (r > 0.88) add(Lv, "bush", jx, jy, { w: 1.1, h: 0.8, r: 0.3 });
+    } else if (forest > 0.56 ? r < 0.36 : r < 0.035) {
       const pine = v > 0.78 || R() < 0.3;
       if (pine) add(Lv, "pine", jx, jy, { w: 1.6, h: 3.8, r: 0.28 });
       else add(Lv, R() < 0.25 ? "birch" : "oak", jx, jy, { w: 2.2, h: 3.2, r: 0.32 });
@@ -352,52 +507,137 @@ function genOverworld(seed) {
     else if (r > 0.935) add(Lv, "bed", jx, jy, { w: 0.9, h: 0.35 });
   }
   Lv.obst = Lv.spr.filter(s => s.r > 0);
+  Lv.cacti = Lv.spr.filter(s => s.type === "cactus");
   buildCasters(Lv);
   Lv.vill = { x0: vx - 2, y0: vy - 2, x1: vx + 34, y1: vy + 24 };
   for (let k = 0; k < 16; k++) { const p = Lv.walk[Math.floor(R() * Lv.walk.length)]; addPick(Lv, "coin", p[0] + (R() - 0.5) * 0.6, p[1] + (R() - 0.5) * 0.6, "coin", { w: 0.4, h: 0.4, z: 0.25, sh: 0 }); }
-  for (let k = 0; k < 60; k++) {
+  for (let k = 0; k < 90; k++) {
     const x = 2 + Math.floor(R() * (W - 4)), y = 2 + Math.floor(R() * (H - 4));
-    if (okTile(x, y) && Lv.fgrid[y][x] === "grass" && !(x >= vx - 2 && x <= vx + 34 && y >= vy - 2 && y <= vy + 24) && fbm(x / 8 + 50, y / 8 + 50) > 0.5)
+    if (okTile(x, y) && ["grass", "swamp"].includes(Lv.fgrid[y][x]) && !inVill(x, y) && !inNoVeg(x, y) && fbm(x / 8 + 50, y / 8 + 50) > 0.5)
       addPick(Lv, "mushroom", x + 0.5, y + 0.5, "mush", { red: true, w: 0.55, h: 0.5 });
   }
+  Lv.pk0 = Lv.pk;
   Lv.spawn = { x: vx + 16.5, y: vy + 12.6, ang: -Math.PI / 2 };
   // ---- aldeanos ----
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < 8; k++) {
     const p = Lv.walk[Math.floor(R() * Lv.walk.length)];
     Lv.act.push(add(Lv, "villager", p[0], p[1], mkVillager(R, k, Object.assign({ home: k % Lv.houses.length, qid: k - 1 }, k === 0 ? { smith: true, name: "Herrero", shirt: [70,52,40], hair: [20,16,14], beard: true, hat: null } : {}))));
   }
+  Lv.pawns = [];
+  [["guerrero", 14.6, 9.0], ["arquero", 19.4, 9.0], ["mago", 15.6, 11.6], ["clerigo", 18.6, 11.6]].forEach(([cls, x, y], i) => { const pw = mkPawn(Lv, cls, vx + x, vy + y, i); pw.home = { x: vx + x, y: vy + y }; Lv.pawns.push(pw); });
   for (const v of Lv.act) if (v.qid >= 0) v.marker = add(Lv, "marker", v.x, v.y, { w: 0.22, h: 0.32, z: 1.2, sh: 0, kind: "!" });
-  // ---- interiores y cueva ----
+  // guardianes de las ruinas
+  for (const [t, gx, gy, mid] of Lv.ruinsGuards) mkMob(Lv, t, gx, gy, mid).mid = mid;
+  // ---- interiores, cueva y mina ----
   Lv.houses.forEach(h => { h.level = genHouse(Lv, h, seed); });
+  Lv.towerLevel = genTower(Lv, Lv.mtower, seed);
   Lv.caveLevel = null;
   for (let tries = 0; tries < 12 && !Lv.caveLevel; tries++) Lv.caveLevel = genCave(seed + tries * 31);
   if (!Lv.caveLevel) return null;
   Lv.caveLevel.ret = { lvl: Lv, x: Lv.caveDoor.outX, y: Lv.caveDoor.outY, ang: Lv.caveDoor.ang };
+  Lv.mines = [0, 1, 2].map(d => genMine(seed, d));
+  Lv.mines[0].ret = { lvl: Lv, x: Lv.mineDoor.outX, y: Lv.mineDoor.outY, ang: Lv.mineDoor.ang };
+  return Lv;
+}
+
+function genTower(over, tw, seed) {
+  const R = rng(seed * 31 + 4242), W = 9, H = 7, Lv = newLevel("house", W, H, ".");
+  Lv.ceil = 3.2; Lv.magic = true; Lv.pal = { id: 90, wall: [96,86,128], roof: [90,50,150], trim: [220,200,255], shut: [90,50,150] };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (x === 0 || y === 0 || x === W - 1 || y === H - 1) Lv.grid[y][x] = "I";
+    Lv.fgrid[y][x] = "rune";
+  }
+  Lv.grid[0][2] = "w"; Lv.grid[0][W - 3] = "w"; Lv.grid[3][0] = "w"; Lv.grid[3][W - 1] = "w";
+  const ex = W >> 1; Lv.grid[H - 1][ex] = "X";
+  add(Lv, "orb", ex + 0.5, 1.5, { w: 0.9, h: 1.5, r: 0.45 }); Lv.lamps.push([ex + 0.5, 1.8]);
+  [[1.35, 1.7], [1.35, 3.2], [1.35, 4.7], [W - 1.35, 1.7], [W - 1.35, 3.2], [W - 1.35, 4.7]].forEach(([x, y], k) => add(Lv, "bookshelf", x, y, { w: 1.1, h: 2.0, r: 0.4, seed: 5 + k }));
+  add(Lv, "cauldron", 6.6, 5.2, { w: 0.9, h: 0.9, r: 0.4 });
+  Lv.obst = Lv.spr.filter(s => s.r > 0);
+  const mg = add(Lv, "villager", ex + 1.0, 4.3, mkVillager(R, 5, { name: "Eldrin", mage: true, qid: 7, inside: true, hat: [96,56,160], shirt: [74,44,128], hair: [236,236,240], beard: true, skin: SKINS[0] }));
+  Lv.act.push(mg); mg.marker = add(Lv, "marker", mg.x, mg.y, { w: 0.22, h: 0.32, z: 1.2, sh: 0, kind: "!" });
+  Lv.walk = [[3, 4], [W - 3, 4], [ex + 0.5, 4.8], [ex + 0.5, 2.9]];
+  Lv.spawn = { x: ex + 0.5, y: H - 1.7, ang: -Math.PI / 2 };
+  Lv.ret = { lvl: over, x: tw.outX, y: tw.outY, ang: Math.PI / 2 };
   Lv.pk0 = Lv.pk;
   return Lv;
 }
 
-function mkVillager(R, k, o) {
-  return Object.assign({ actor: true, w: 0.5, h: 1.05, r: 0.24, skin: SKINS[Math.floor(R() * 4)], shirt: SHIRTS[Math.floor(R() * SHIRTS.length)],
-    pants: [70 + R() * 50 | 0, 60 + R() * 40 | 0, 50 + R() * 40 | 0], hair: HAIRS[Math.floor(R() * HAIRS.length)],
-    hat: R() < 0.4 ? [216, 184, 96] : null, beard: R() < 0.25, phase: R() * 6, moving: false, tx: 0, ty: 0, wait: R() * 3, stuck: 0,
-    name: NAMES[k % NAMES.length], line: Math.floor(R() * 100), sh: 0.4 }, o);
-}
-
-function buildCasters(Lv) {
-  const RES = 4, CW = Lv.W * RES, CH = Lv.H * RES;
-  const cg = new Float32Array(CW * CH);
-  for (const s of Lv.spr) {
-    if (!["oak", "pine", "birch", "palm"].includes(s.type)) continue;
-    const r = s.type === "pine" ? 0.7 : (s.type === "palm" ? 0.5 : 1.0), h = s.type === "pine" ? 3.4 : 3.0;
-    for (let fy = Math.floor((s.y - r) * RES); fy <= Math.floor((s.y + r) * RES); fy++)
-      for (let fx = Math.floor((s.x - r) * RES); fx <= Math.floor((s.x + r) * RES); fx++) {
-        if (fx < 0 || fy < 0 || fx >= CW || fy >= CH) continue;
-        const dx = (fx + 0.5) / RES - s.x, dy = (fy + 0.5) / RES - s.y;
-        if (dx * dx + dy * dy < r * r) cg[fy * CW + fx] = Math.max(cg[fy * CW + fx], h);
-      }
+function genMine(seed, depth) {
+  const R = rng(seed * 6007 + depth * 977 + 11), W = 60, H = 48, Lv = newLevel("cave", W, H, "R");
+  Lv.ceil = 3.0; Lv.mine = depth + 1;
+  const ok = (x, y) => x > 1 && y > 1 && x < W - 2 && y < H - 2;
+  const carve = (cx, cy, hw) => { for (let dy = -hw; dy <= hw; dy++) for (let dx = -hw; dx <= hw; dx++) { const x = cx + dx, y = cy + dy; if (ok(x, y)) { Lv.grid[y][x] = "."; Lv.fgrid[y][x] = "cave"; } } };
+  const ry = (H >> 1) + Math.round((R() - 0.5) * 12);
+  carve(5, ry, 2); carve(7, ry, 1);
+  let x = 7, y = ry, guard = 0; const path = [[5, ry, "H"], [6, ry, "H"], [7, ry, "H"]];
+  while (x < W - 14 && guard++ < 90) {
+    const len = 5 + Math.floor(R() * 7);
+    for (let i = 0; i < len && x < W - 13; i++) { x++; carve(x, y, 1); path.push([x, y, "H"]); }
+    if (R() < 0.65) {
+      const dy = R() < 0.5 ? -1 : 1, vl = 3 + Math.floor(R() * 6);
+      for (let i = 0; i < vl; i++) { const ny = y + dy; if (ny < 6 || ny > H - 7) break; y = ny; carve(x, y, 1); path.push([x, y, "V"]); }
+    }
+    if (R() < 0.12) carve(x, y, 2);
   }
-  Lv.cg = cg; Lv.cgW = CW;
+  carve(x + 1, y, 1); carve(x + 3, y, 2); for (let i = 1; i <= 4; i++) path.push([x + i, y, "H"]);
+  const endX = x, endY = y, rooms = [];
+  for (let k = 0; k < 3; k++) {
+    const pi = 10 + Math.floor(R() * Math.max(1, path.length - 20)), p = path[pi], bx = p[0], by = p[1];
+    const sg = R() < 0.5 ? -1 : 1; let yy = by, cnt = 0;
+    for (let i = 0, len = 8 + Math.floor(R() * 8); i < len; i++) { const ny = yy + sg; if (ny < 5 || ny > H - 6) break; yy = ny; carve(bx, yy, 1); cnt++; }
+    if (cnt >= 4) { carve(bx, yy, 2); rooms.push({ x: bx, y: yy }); }
+  }
+  Lv.grid[ry][2] = "U"; Lv.up = { x: 2, y: ry, outX: 3.5, outY: ry + 0.5, ang: 0 };
+  if (depth < 2) { Lv.grid[endY][endX + 6] = "S"; Lv.dn = { x: endX + 6, y: endY, outX: endX + 5.5, outY: endY + 0.5, ang: Math.PI }; }
+  for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) if (Lv.grid[yy][xx] === "." && fbm(xx / 5 + 9 + depth * 7, yy / 5 + 9) > 0.7) Lv.fgrid[yy][xx] = "puddle";
+  for (const p of path) Lv.fgrid[p[1]][p[0]] = p[2] === "H" ? "railH" : "railV";
+  const B = bfs(Lv, 3, ry), floors = [];
+  for (let yy = 2; yy < H - 2; yy++) for (let xx = 2; xx < W - 2; xx++) if (B.dist[yy * W + xx] >= 0) floors.push([xx, yy, B.dist[yy * W + xx]]);
+  // antorchas y postes
+  for (let yy = 2; yy < H - 2; yy++) for (let xx = 2; xx < W - 2; xx++) {
+    if (Lv.grid[yy][xx] !== "R") continue;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = xx + dx, ny = yy + dy;
+      if (Lv.grid[ny]?.[nx] !== "." || B.dist[ny * W + nx] < 0) continue;
+      const near = Lv.lamps.some(l => Math.hypot(l[0] - nx - 0.5, l[1] - ny - 0.5) < 5.5);
+      if (!near && R() < 0.2) { const lx = nx + 0.5 - dx * 0.4, ly = ny + 0.5 - dy * 0.4; add(Lv, "torch", lx, ly, { w: 0.45, h: 0.8, z: 1.2, sh: 0 }); Lv.lamps.push([lx, ly]); }
+      else if (near && R() < 0.025) add(Lv, "beam", nx + 0.5 - dx * 0.3, ny + 0.5 - dy * 0.3, { w: 0.5, h: 3.0, r: 0.15, sh: 0.3 });
+      break;
+    }
+  }
+  for (let k = 0; k < path.length; k += 1) if (k > 14 && R() < 0.02) add(Lv, "minecart", path[k][0] + 0.5, path[k][1] + 0.5, { w: 1.2, h: 0.8, r: 0.38, sh: 0.5 });
+  // minerales y botín
+  for (const f of floors) {
+    const r = R(), fx = f[0] + 0.25 + R() * 0.5, fy = f[1] + 0.25 + R() * 0.5;
+    if (f[2] < 4) continue;
+    if (r < 0.03 + 0.012 * depth) addPick(Lv, "orepick", fx, fy, "ore", { w: 0.5, h: 0.4, sh: 0.2 });
+    else if (depth >= 1 && r < 0.036 + 0.012 * depth) addPick(Lv, "goldpick", fx, fy, "gold", { w: 0.45, h: 0.35, sh: 0.2 });
+    else if (r < 0.048 + 0.012 * depth) addPick(Lv, "crystal", fx, fy, "crystal", { w: 0.6, h: 0.9 });
+    else if (r < 0.056 + 0.012 * depth) addPick(Lv, "mushroom", fx, fy, "mush", { w: 0.6, h: 0.5, sh: 0.3 });
+    else if (r < 0.066 + 0.012 * depth) addPick(Lv, "coin", fx, fy, "coin", { w: 0.4, h: 0.4, z: 0.25, sh: 0 });
+  }
+  if (depth < 2) { const rm = rooms[0] || { x: path[path.length >> 1][0], y: path[path.length >> 1][1] }; Lv.chests.push(add(Lv, "chest", rm.x + 0.5, rm.y + 0.5, { w: 0.95, h: 0.62, r: 0.35, open: false, loot: "minor" })); }
+  // enemigos
+  const counts = [[["zombie", 4], ["skeleton", 2], ["spider", 4], ["bat", 5]], [["zombie", 5], ["skeleton", 4], ["spider", 6], ["bat", 6]], [["zombie", 6], ["skeleton", 5], ["spider", 7], ["bat", 7]]][depth];
+  const zs = [];
+  for (const [type, cnt] of counts) {
+    let placed = 0;
+    for (let tries = 0; tries < 800 && placed < cnt; tries++) {
+      const f = floors[Math.floor(R() * floors.length)];
+      if (f[2] < 10 || (depth === 2 && Math.hypot(f[0] - endX - 3, f[1] - endY) < 5) || zs.some(z => Math.hypot(z.x - f[0] - 0.5, z.y - f[1] - 0.5) < 3)) continue;
+      zs.push({ type, x: f[0] + 0.5, y: f[1] + 0.5 }); placed++;
+    }
+  }
+  Lv.obst = Lv.spr.filter(s => s.r > 0);
+  zs.forEach((p, k) => { mkMob(Lv, p.type, p.x, p.y, k * 7).mid = k; });
+  if (depth === 2) {
+    const ch = add(Lv, "chest", endX + 4.8, endY + 0.5, { w: 0.95, h: 0.62, r: 0.35, open: false, loot: "mine" }); Lv.obst.push(ch);
+    Lv.boss = mkMob(Lv, "golem", endX + 2.8, endY + 0.5, 99); Lv.boss.mid = 99;
+    ch.guard = Lv.boss; Lv.chests.push(ch);
+  }
+  Lv.spawn = { x: 3.5, y: ry + 0.5, ang: 0 };
+  Lv.walk = []; Lv.pk0 = Lv.pk;
+  return Lv;
 }
 
 function genHouse(over, h, seed) {
@@ -495,6 +735,7 @@ function genCave(seed) {
   zs.forEach((p, k) => { mkMob(Lv, p.type, p.x, p.y, k * 7).mid = k; });
   const bf = floors.find(f => { const d = Math.hypot(f[0] - far[0], f[1] - far[1]); return d >= 3 && d <= 5; }) || far;
   Lv.boss = mkMob(Lv, "boss", bf[0] + 0.5, bf[1] + 0.5, 99); Lv.boss.mid = 99;
+  Lv.chests.push(Lv.chest); Lv.chest.guard = Lv.boss;
   Lv.spawn = { x: sx + 0.9, y: sy + 0.5, ang: 0 };
   Lv.walk = []; Lv.pk0 = Lv.pk;
   return Lv;
@@ -508,28 +749,13 @@ let FOVH = 74 * Math.PI / 180, TAN = Math.tan(FOVH / 2);
 function setFov(d) { FOVH = d * Math.PI / 180; TAN = Math.tan(FOVH / 2); if (bgB) fit(); }
 const screen = $("screen"), cv = $("cv"), ctx = cv.getContext("2d");
 let bgB, fgB, chB, HD, HS0, HS1, HN;
-function fit() {
-  DPR = Math.min(2, (typeof devicePixelRatio !== "undefined" && devicePixelRatio) || 1);
-  LH = Math.max(6, Math.round((FONT + boost) * DPR));
-  const fontStr = LH + 'px "Cascadia Mono",Consolas,Menlo,monospace';
-  ctx.font = fontStr; cw = ctx.measureText("M").width;
-  const w = screen.clientWidth * DPR, h = screen.clientHeight * DPR;
-  COLS = Math.max(60, Math.floor(w / cw)); ROWS = Math.max(30, Math.floor(h / LH));
-  cv.width = Math.ceil(COLS * cw); cv.height = ROWS * LH;
-  cv.style.width = (cv.width / DPR) + "px"; cv.style.height = (cv.height / DPR) + "px";
-  ctx.font = fontStr; ctx.textBaseline = "top";
-  PK = (cv.width / 2) / TAN / LH;
-  const N = COLS * ROWS;
-  bgB = new Int32Array(N); fgB = new Int32Array(N); chB = new Uint16Array(N);
-  HD = new Float32Array(COLS * 4); HS0 = new Int16Array(COLS * 4); HS1 = new Int16Array(COLS * 4); HN = new Uint8Array(COLS);
-}
 let rsz; addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(fit, 120); });
 
 const EYE0 = 0.95;
 let px = 0, py = 0, ang = 0, pitch = 0, pz = 0, vz = 0, EYE = 0.95;
 let keys = {}, locked = false, dayT = 0.12, autoDay = true, T = 0;
 const DAY_LEN = 170;
-const P = { hp: 10, max: 10, swing: -1, hitDone: false, tcool: 0, hurtT: 0, regen: 0, dead: false, moving: false, kills: 0, sword: 0, shield: false, bow: false, wpn: 1, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5, sta: 100, staMax: 100, staDelay: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, ddx: 0, ddy: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0 };
+const P = { hp: 10, max: 10, swing: -1, hitDone: false, tcool: 0, hurtT: 0, regen: 0, dead: false, moving: false, kills: 0, sword: 0, shield: false, bow: false, wpn: 1, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5, sta: 100, staMax: 100, staDelay: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, ddx: 0, ddy: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0, staff: false, boat: null, cactusCd: 0 };
 
 // ============================================================
 //  CLIMA
@@ -583,6 +809,11 @@ function envUpdate() {
     FL = W.flash;
     NF = clamp((0.72 - L) / 0.30, 0, 1); GLOWK = NF * 0.75;
     FOG0 = lerp(8, 1.5, W.fog); FOG1 = lerp(44, 11, clamp(W.fog + W.rain * 0.35 + W.snow * 0.25, 0, 1));
+    { const bz = biomeAt(px, py); for (let k = 1; k <= 3; k++) BZW[k] += ((bz === k ? 1 : 0) - BZW[k]) * 0.03;
+      const TG = [null, [236,206,150], [214,226,242], [100,122,92]], MWt = [0, 0.28, 0.3, 0.55];
+      for (let b = 1; b <= 3; b++) if (BZW[b] > 0.01) for (let k = 0; k < 3; k++) SH[k] = lerp(SH[k], TG[b][k], MWt[b] * BZW[b]);
+      FOG0 = lerp(FOG0, 2.5, BZW[3]); FOG1 = lerp(FOG1, Math.min(FOG1, 20), BZW[3]); FOG1 = lerp(FOG1, Math.min(FOG1, 34), BZW[2]);
+      for (let k = 0; k < 3; k++) FOGc[k] = SH[k]; }
     const ts = t < 0.45 ? t / 0.45 : (t - 0.45) / 0.55;
     sunAz = -2.55 + 2.3 * (t < 0.45 ? ts : 1); moonAz = -2.55 + 2.3 * (t >= 0.45 ? ts : 0) + 0.6;
     sunEl = t < 0.45 ? Math.sin(Math.PI * ts) : -1; moonEl = t >= 0.45 ? Math.sin(Math.PI * ts) : -1;
@@ -599,9 +830,9 @@ function envUpdate() {
     phaseName = "🏠";
   } else {
     const fl = 0.95 + 0.04 * Math.sin(T * 13) + 0.02 * Math.sin(T * 31);
-    L = 0.78 * fl; TN[0] = 1; TN[1] = 0.82; TN[2] = 0.6; NF = 1; GLOWK = 0.95; FOG0 = 1.4; FOG1 = 11.5; SHSTR = 0;
+    const dm = LV.mine || 0; L = (0.78 - 0.04 * dm) * fl; TN[0] = 1; TN[1] = 0.82; TN[2] = 0.6; NF = 1; GLOWK = 0.95; FOG0 = 1.4; FOG1 = 11.5 - 1.2 * dm; SHSTR = 0;
     FOGc[0] = 4; FOGc[1] = 5; FOGc[2] = 8; LR = L * TN[0]; LG = L * TN[1]; LB = L * TN[2];
-    phaseName = "🕳";
+    phaseName = dm ? "⛏ " + dm : "🕳";
   }
   ACT.length = 0;
   for (let k = 0; k < LAMPS.length; k++) { const dx = LAMPS[k][0] - px, dy = LAMPS[k][1] - py; if (dx * dx + dy * dy < 500) ACT.push(LAMPS[k]); }
@@ -676,9 +907,9 @@ const TOWER_ROOF = [176,64,52], ROCK = [126,122,118], CROCK = [98,90,86];
 function floorOver(i, wx, wy, d) {
   let ft = ftAt(wx, wy);
   const n = hash(wx * 5, wy * 5);
-  if (ft === "grass" || ft === "path" || ft === "sand") {
+  if (ft === "grass" || ft === "path" || ft === "sand" || ft === "dune" || ft === "snow" || ft === "swamp") {
     const f2 = ftAt(wx + (hash(wx * 9, wy * 9) - 0.5) * 0.24, wy + (hash(wx * 9 + 7, wy * 9 + 3) - 0.5) * 0.24);
-    if (f2 === "grass" || f2 === "path" || f2 === "sand") ft = f2;
+    if (f2 === "grass" || f2 === "path" || f2 === "sand" || f2 === "dune" || f2 === "snow" || f2 === "swamp") ft = f2;
   }
   const ix = Math.floor(wx), iy = Math.floor(wy), fx = wx - ix, fy = wy - iy;
   let glow = GLOWK > 0.05 ? lampGlow(wx, wy) : 0, fogF = fogOf(d), sh = 1 - 0.13 * W.rain;
@@ -707,6 +938,32 @@ function floorOver(i, wx, wy, d) {
     } else if (ft === "path") {
       const rut = Math.abs(fx - 0.3) < 0.05 || Math.abs(fx - 0.7) < 0.05;
       S(PATH, (0.9 + 0.2 * n) * (rut ? 0.88 : 1), PEB, 1, n > 0.82 ? "." : (n > 0.62 ? "," : " "), 0);
+    } else if (ft === "dune") {
+      const rip = Math.sin(wx * 4.6 + wy * 1.7 + n * 1.5) * 0.5 + 0.5, p = hash(wx * 0.6, wy * 0.6);
+      mix(sBg, [214,172,98], [236,198,126], p * 0.6 + rip * 0.4);
+      sFg[0] = 250; sFg[1] = 222; sFg[2] = 150; sEm = 0;
+      sCh = rip > 0.82 ? 126 : (n > 0.8 ? 46 : (n > 0.6 ? 44 : 32));
+      if (n > 0.985) { sFg[0] = 120; sFg[1] = 100; sFg[2] = 70; sCh = 111; }
+    } else if (ft === "snow") {
+      const p = hash(wx * 0.7, wy * 0.7);
+      mix(sBg, [222,232,246], [244,248,252], p); sFg[0] = 255; sFg[1] = 255; sFg[2] = 255; sEm = 0;
+      sCh = n > 0.97 ? 42 : (n > 0.8 ? 46 : 32);
+      if (n > 0.97) { sFg[0] = 180; sFg[1] = 215; sFg[2] = 255; }
+    } else if (ft === "swamp") {
+      const p = hash(wx * 0.9, wy * 0.9);
+      mix(sBg, [48,60,40], [68,84,52], p);
+      sFg[0] = 98; sFg[1] = 132; sFg[2] = 72; sEm = 0; sCh = n > 0.8 ? 34 : (n > 0.55 ? 44 : (n > 0.4 ? 46 : 32));
+      if (n > 0.95) { sFg[0] = 200; sFg[1] = 190; sFg[2] = 130; sCh = 111; }
+    } else if (ft === "bog") {
+      const w1 = Math.sin(wx * 2 + T * 0.9) + Math.sin(wy * 2.6 - T * 0.7);
+      mix(sBg, [34,56,44], [52,84,58], clamp((w1 + 2) / 4, 0, 1));
+      sFg[0] = 116; sFg[1] = 170; sFg[2] = 90; sEm = 0; sCh = n > 0.85 ? 34 : (n > 0.6 ? 126 : 45); fogF = Math.max(fogF, 0.08);
+    } else if (ft === "ruin") {
+      const tone = 0.82 + 0.3 * hash(Math.floor(wx * 1.5), Math.floor(wy * 1.5)), line = ((wx * 1.5) % 1) < 0.08 || ((wy * 1.5) % 1) < 0.08;
+      const des = biomeAt(wx, wy) === 1, base = des ? [200,176,128] : [140,136,126];
+      if (line) S([70,66,58], 1, [60,56,50], 1, " ", 0);
+      else if (!des && hash(wx * 2.2, wy * 2.2) > 0.84) S([66,104,60], 0.9, [96,150,86], 1, "\"", 0);
+      else S(base, tone, base, 1.15, n > 0.8 ? "." : (n > 0.55 ? ":" : " "), 0);
     } else if (ft === "sand") {
       const rip = Math.sin(wx * 7 + wy * 2 + n * 2) * 0.5 + 0.5;
       const wet = tileAt(wx + 0.6, wy) === "~" || tileAt(wx - 0.6, wy) === "~" || tileAt(wx, wy + 0.6) === "~" || tileAt(wx, wy - 0.6) === "~";
@@ -720,7 +977,7 @@ function floorOver(i, wx, wy, d) {
       sCh = n > 0.82 ? ((Math.sin(T * 2.2 + wx * 3 + wy * 2) * W.wind > 0.1) ? 47 : 34) : n > 0.55 ? 44 : n > 0.38 ? 46 : 32;
       if (d < 11) { const fh = hash(wx * 2.3, wy * 2.3); if (fh > 0.972) { const c = FLOWERS[Math.floor(hash(wx * 7, wy * 7) * 4)]; sFg[0] = c[0]; sFg[1] = c[1]; sFg[2] = c[2]; sCh = 42; } }
     }
-    if (W.snowG > 0.02 && ft !== "dock") snowTint(W.snowG * (0.72 + 0.28 * n));
+    if (W.snowG > 0.02 && ft !== "dock" && ft !== "dune" && ft !== "ruin" && ft !== "snow") snowTint(W.snowG * (0.72 + 0.28 * n));
     if (SHSTR > 0 && d < 20 && shadowAt(wx, wy)) sh *= 1 - 0.46 * SHSTR;
     if (d < 14 && (WALLS.includes(tileAt(wx + 0.3, wy)) || WALLS.includes(tileAt(wx - 0.3, wy)) || WALLS.includes(tileAt(wx, wy + 0.3)) || WALLS.includes(tileAt(wx, wy - 0.3)))) sh *= 0.8;
   }
@@ -730,7 +987,11 @@ const WOOD_F = [168,118,68], RUG = [152,46,50], RUG_B = [232,208,152], HEARTH = 
 function floorHouse(i, wx, wy, d) {
   const ix = Math.floor(wx), iy = Math.floor(wy), ft = fgrid[iy]?.[ix] || "wood", glow = lampGlow(wx, wy);
   const r = Math.floor(wy * 4), n = hash(wx * 6, wy * 6);
-  if (ft === "hearth") { const chk = (Math.floor(wx * 2) + Math.floor(wy * 2)) & 1; S(HEARTH, chk ? 1 : 0.86, [90,88,88], 1, chk ? "." : " ", 0); }
+  if (ft === "rune") {
+    const rr = Math.hypot(wx - 4.5, wy - 3.5), ring = Math.abs(rr - 1.3) < 0.07 || Math.abs(rr - 0.7) < 0.05 || Math.abs(rr - 2.1) < 0.05;
+    const spoke = rr < 2.1 && Math.abs(Math.sin(Math.atan2(wy - 3.5, wx - 4.5) * 3 + T * 0.4)) < 0.06;
+    if (ring || spoke) S([100,60,160], 1, [210,170,255], 1, "+", 1); else S([54,48,70], 0.9 + 0.2 * n, [80,72,100], 1, n > 0.8 ? "." : " ", 0);
+  } else if (ft === "hearth") { const chk = (Math.floor(wx * 2) + Math.floor(wy * 2)) & 1; S(HEARTH, chk ? 1 : 0.86, [90,88,88], 1, chk ? "." : " ", 0); }
   else if (ft === "rug") {
     const b = (wx % 1) < 0.1 || (wy % 1) < 0.1 || ((wx * 2) % 1 < 0.06 && (Math.floor(wx) + Math.floor(wy)) & 1);
     if (b) S(RUG_B, 1, [190,160,110], 1, ":", 0); else S(RUG, 0.9 + 0.2 * n, [190,70,72], 1, n > 0.6 ? "+" : " ", 0);
@@ -738,9 +999,10 @@ function floorHouse(i, wx, wy, d) {
     const seam = ((wy * 4) % 1) < 0.1 || (((wx + (r & 1) * 0.5 + hash(r, 3) * 0.7) % 1.2) < 0.05);
     S(WOOD_F, seam ? 0.62 : 0.88 + 0.22 * hash(r, Math.floor(wx + (r & 1) * 0.5)), [120,80,44], 1, seam ? "_" : (n > 0.7 ? "-" : " "), 0);
   }
-  putCell(i, sCh, sBg, sFg, fogOf(d), 1, glow, 0);
+  putCell(i, sCh, sBg, sFg, fogOf(d), 1, glow, sEm);
 }
 function floorCave(i, wx, wy, d) {
+  if (LV.mine) { floorMine(i, wx, wy, d); return; }
   const ft = ftAt(wx, wy), n = hash(wx * 5, wy * 5), glow = lampGlow(wx, wy);
   if (ft === "puddle") {
     const w1 = Math.sin(wx * 3 + T * 1.1) + Math.sin(wy * 3.4 - T * 0.9);
@@ -753,18 +1015,6 @@ function floorCave(i, wx, wy, d) {
   let sh = 1;
   if (WALLS.includes(tileAt(wx + 0.3, wy)) || SOLID.includes(tileAt(wx + 0.3, wy)) || SOLID.includes(tileAt(wx - 0.3, wy)) || SOLID.includes(tileAt(wx, wy + 0.3)) || SOLID.includes(tileAt(wx, wy - 0.3))) sh = 0.78;
   putCell(i, sCh, sBg, sFg, fogOf(d), sh, glow, 0);
-}
-function ceilPixel(i, wx, wy, d) {
-  const glow = lampGlow(wx, wy), n = hash(wx * 5, wy * 5);
-  if (LV.type === "house") {
-    const bx = ((wx % 1.6) + 1.6) % 1.6, seam = ((wy * 5) % 1) < 0.08;
-    if (bx < 0.18) S([80,52,30], 1, [110,74,44], 1, "#", 0);
-    else S([146,104,64], seam ? 0.7 : 0.9 + 0.2 * hash(Math.floor(wy * 5), 4), [118,82,50], 1, seam ? "_" : "=", 0);
-  } else {
-    const c = 0.8 + 0.3 * n;
-    S([76,68,64], c, [112,102,96], 1, n > 0.93 ? "V" : (n > 0.75 ? ":" : " "), 0);
-  }
-  putCell(i, sCh, sBg, sFg, fogOf(d), 0.85, glow, 0);
 }
 function floorPixel(i, wx, wy, d) {
   if (LV.type === "over") floorOver(i, wx, wy, d); else if (LV.type === "house") floorHouse(i, wx, wy, d); else floorCave(i, wx, wy, d);
@@ -781,12 +1031,12 @@ function skyPixel(i, x, y, wa, hz) {
     if (hs > 0.986) { const tw = 0.6 + 0.4 * Math.sin(T * 2.5 + hs * 90); ch = hs > 0.997 ? 42 : 46; fr = fg = fb = 255 * tw * NF * (1 - W.cloud); }
   }
   if (sunOn) {
-    const d = Math.hypot((x + 0.5 - sunC) * cw, (y + 0.5 - sunR) * LH), R = LH * 3, vis = 1 - W.cloud * 1.1;
+    const d = Math.hypot((x + 0.5 - sunC) * cw, (y + 0.5 - sunR) * LH), R = cv.height * 0.05, vis = 1 - W.cloud * 1.1;
     if (d < R && vis > 0) { r = lerp(r, 255, vis); g = lerp(g, 238, vis); b = lerp(b, 170, vis); ch = 32; }
     else if (d < R * 4) { const f = Math.pow(1 - (d - R) / (R * 3), 2) * 0.55 * Math.max(0, vis); r += (255 - r) * f; g += (220 - g) * f; b += (150 - b) * f; }
   }
   if (moonOn) {
-    const d = Math.hypot((x + 0.5 - moonC) * cw, (y + 0.5 - moonR) * LH), R = LH * 2.3, vis = 1 - W.cloud * 1.1;
+    const d = Math.hypot((x + 0.5 - moonC) * cw, (y + 0.5 - moonR) * LH), R = cv.height * 0.038, vis = 1 - W.cloud * 1.1;
     if (d < R && vis > 0) { const c = hash(x * 0.7, y * 0.7) > 0.86 ? 0.86 : 1; r = lerp(r, 232 * c, vis); g = lerp(g, 236 * c, vis); b = lerp(b, 246 * c, vis); ch = 32; }
     else if (d < R * 3.5) { const f = Math.pow(1 - (d - R) / (R * 2.5), 2) * 0.35 * Math.max(0, vis); r += (200 - r) * f; g += (215 - g) * f; b += (245 - b) * f; }
   }
@@ -876,6 +1126,7 @@ function hedgeTex(hd, u, hh) {
   if (LV.type === "over" && W.snowG > 0.05 && hh > hd.h - 0.25) snowTint(W.snowG * 0.9);
 }
 function rockTex(hd, u, hh, cave) {
+  if (cave && LV.mine) { mineRockTex(hd, u, hh); return; }
   const n = hash(u * 20 + hd.mx * 3, hh * 16 + hd.my * 5), band = Math.sin(hh * 6 + hash(hd.mx, hd.my) * 6 + u * 1.5);
   const base = cave ? CROCK : ROCK;
   const crack = hash(Math.floor(u * 9 + hd.mx * 5), Math.floor(hh * 5 + hd.my)) > 0.9 && n > 0.5;
@@ -896,6 +1147,7 @@ function caveMouthTex(hd, u, hh) {
 }
 function interiorTex(hd, hh) {
   const u = hd.u, t = hd.tile, n = hash(u * 20 + hd.mx * 3.3, hh * 16 + hd.my * 5.1), P2 = LV.pal || {};
+  if (t === "S" || t === "U") { stairsTex(hd, u, hh); return; }
   if (t === "X") {
     if (LV.type === "house") {
       if (u > 0.16 && u < 0.84 && hh < 1.55) { if (u < 0.22 || u > 0.78 || hh > 1.48) { S([96,66,40], 1, [66,44,26], 1, "|", 0); return; } S([SH[0], SH[1], SH[2]], 1, [255,255,240], 1, ".", 1); return; }
@@ -907,6 +1159,12 @@ function interiorTex(hd, hh) {
       if (u < 0.26 || u > 0.74 || hh < 0.71 || hh > 1.44 || Math.abs(u - 0.5) < 0.025 || Math.abs(hh - 1.075) < 0.025) { S([96,66,40], 1, [66,44,26], 1, "#", 0); return; }
       S([SH[0], SH[1], SH[2]], 1, [255,255,255], 1, ((u * 6 + hh * 6) % 1) < 0.15 ? "/" : " ", 1); return;
     }
+  }
+  if (LV.magic && t === "I") {
+    const row = Math.floor(hh * 2.5), bx = (u * 2 + (row & 1) * 0.5) % 1;
+    if (hd.mx % 3 === 1 && u > 0.3 && u < 0.7 && hh > 1.1 && hh < 2.9) { S([110,50,160], 0.9 + 0.2 * n, [220,170,255], 1, (hh > 2.7 || hh < 1.2) ? "=" : "|", 0); return; }
+    if (bx < 0.06 || ((hh * 2.5) % 1) < 0.07) S([46,40,60], 1, [70,62,90], 1, "+", 0); else S([88,80,112], 0.85 + 0.3 * n, [120,110,150], 1, n > 0.7 ? ":" : " ", 0);
+    return;
   }
   if (hh < 0.85) { const pl = ((u * 6) % 1) < 0.1; S([104,70,40], pl ? 0.7 : 0.9 + 0.2 * n, [74,48,28], 1, pl ? "|" : (n > 0.7 ? "-" : " "), 0); return; }
   if (hh < 0.92) { S([70,46,28], 1, [52,34,20], 1, "=", 0); return; }
@@ -925,6 +1183,10 @@ function wallTex(hd, hh) {
   else if (t === "h") hedgeTex(hd, hd.u, hh);
   else if (t === "M") rockTex(hd, hd.u, hh, false);
   else if (t === "C") caveMouthTex(hd, hd.u, hh);
+  else if (t === "N") mineMouthTex(hd, hd.u, hh);
+  else if (t === "Y") mageTex(hd, hh);
+  else if (t === "G") mageDoorTex(hd, hh);
+  else if (t === "Z") ruinTex(hd, hd.u, hh);
   else interiorTex(hd, hh);
 }
 
@@ -948,7 +1210,7 @@ function cast(rdx, rdy) {
       let u = side === 0 ? py + dist * rdy : px + dist * rdx; u -= Math.floor(u);
       if ((side === 0 && rdx < 0) || (side === 1 && rdy > 0)) u = 1 - u;
       hd.dist = Math.max(0.05, dist); hd.side = side; hd.tile = t; hd.mx = mx; hd.my = my; hd.u = u; hd.hid = hid[my][mx];
-      hd.h = t === "h" ? 0.66 + 0.07 * Math.sin(u * 22 + mx * 3) : h0;
+      hd.h = t === "h" ? 0.66 + 0.07 * Math.sin(u * 22 + mx * 3) : t === "Z" ? h0 * (0.78 + 0.22 * hash(Math.floor(u * 5) + mx * 13, my * 7)) : h0;
       if (t === "K") {
         const tw = LV.tower; let idx;
         if (side === 1) idx = rdy < 0 ? mx - tw.x : 1 - (mx - tw.x); else idx = rdx > 0 ? my - tw.y : 1 - (my - tw.y);
@@ -1036,7 +1298,7 @@ function humanoid(s, u, v) {
 }
 function spritePixel(s, u, v) {
   switch (s.type) {
-    case "villager": case "zombie": case "boss": case "skeleton": return humanoid(s, u, v);
+    case "villager": case "zombie": case "boss": case "skeleton": case "pawn": return humanoid(s, u, v);
     case "oak": case "birch": {
       const bi = s.type === "birch", ex = (u - 0.5) / (bi ? 0.42 : 0.5), ey = (v - (bi ? 0.3 : 0.34)) / (bi ? 0.3 : 0.34);
       const lump = 0.16 * (hash(Math.floor(u * 10) + s.seed * 7, Math.floor(v * 10) + s.seed * 3) - 0.5);
@@ -1061,7 +1323,7 @@ function spritePixel(s, u, v) {
         if (Math.abs(u - 0.5) < hw) {
           const l = clamp(1.1 - (u - 0.5) - v * 0.2, 0.6, 1.2), n = hash(u * 16, v * 16 + s.seed);
           S(PINE, 0.6 * l, PINE, 1.35 * l, n > 0.5 ? "^" : "A", 0);
-          if (LV.type === "over" && W.snowG > 0.05 && f < 0.55) snowTint(W.snowG * 0.8);
+          if (s.snowy && f < 0.62) snowTint(0.85); else if (LV.type === "over" && W.snowG > 0.05 && f < 0.55) snowTint(W.snowG * 0.8);
           return true;
         }
       }
@@ -1154,7 +1416,86 @@ function spritePixel(s, u, v) {
     case "coin": { const wd = Math.abs(Math.cos(T * 4 + s.seed)) * 0.4 + 0.06; if (Math.hypot((u - 0.5) / wd, (v - 0.5) / 0.42) < 1) { S([255,205,60], 1, [255,246,170], 1, wd > 0.25 ? "o" : "|", 1); return true; } return false; }
     case "arrow": { if (Math.abs(v - 0.5) < 0.12) { if (u > 0.82) S([200,204,214], 1, [240,244,255], 1, ">", 1); else if (u < 0.16) S([240,240,236], 1, [255,255,255], 1, "=", 1); else S([150,104,58], 1, [210,160,100], 1, "-", 1); return true; } return false; }
     case "arrowpick": { for (let k = -1; k <= 1; k++) if (Math.abs(v - (0.5 + k * 0.18) - (u - 0.5) * 0.25) < 0.07) { if (u > 0.8) S([200,204,214], 1, [240,244,255], 1, ">", 1); else S([150,104,58], 1, [210,160,100], 1, "-", 1); return true; } return false; }
-    case "marker": { const q = s.kind; if (!q) return false; const col = q === "?" ? [110,230,120] : [255,214,70]; S(col, 1, [50,30,0], 1, (u > 0.36 && u < 0.64 && v > 0.3 && v < 0.7) ? q : " ", 1); return true; }
+    case "marker": { const q = s.kind; if (!q) return false; const col = q === "?" ? [110,230,120] : q === "p" ? [120,190,255] : [255,214,70]; S(col, 1, [50,30,0], 1, (u > 0.36 && u < 0.64 && v > 0.3 && v < 0.7) ? q : " ", 1); return true; }
+    case "golem": return golemPx(s, u, v);
+    case "cactus": {
+      const body = Math.abs(u - 0.5) < 0.12 && v > 0.08;
+      const armL = (u > 0.12 && u < 0.4 && v > 0.42 && v < 0.54) || (u > 0.12 && u < 0.24 && v > 0.22 && v < 0.54);
+      const armR = (u > 0.6 && u < 0.88 && v > 0.52 && v < 0.62) || (u > 0.76 && u < 0.88 && v > 0.32 && v < 0.62);
+      if (body || armL || armR) {
+        const l = clamp(1.12 - (u - 0.5) * 0.5, 0.75, 1.2), n = hash(u * 22, v * 22);
+        if (v < 0.2 && body && n > 0.75) S([52,128,66], 1, [255,120,160], 1, "*", 0);
+        else S([52,128,66], 0.7 * l, [112,196,112], 1, n > 0.8 ? "." : (n > 0.4 ? "|" : ":"), 0);
+        return true;
+      }
+      return false;
+    }
+    case "deadtree": {
+      const col = s.snowy ? [150,140,130] : [104,82,60];
+      const t = segDist(u, v, 0.5, 1, 0.5, 0.38) < 0.045 || segDist(u, v, 0.5, 0.62, 0.2, 0.3) < 0.03 || segDist(u, v, 0.5, 0.5, 0.82, 0.18) < 0.03 ||
+        segDist(u, v, 0.5, 0.74, 0.76, 0.5) < 0.026 || segDist(u, v, 0.2, 0.3, 0.1, 0.12) < 0.02 || segDist(u, v, 0.82, 0.18, 0.9, 0.06) < 0.02;
+      if (t) { S(col, 0.9, col, 1.3, "|", 0); if (s.snowy) snowTint(0.5); return true; }
+      return false;
+    }
+    case "swamptree": {
+      const ex = (u - 0.5) / 0.5, ey = (v - 0.3) / 0.22;
+      if (ex * ex + ey * ey < 1 + 0.2 * (hash(u * 9 + s.seed, v * 9) - 0.5)) { const n = hash(u * 14, v * 14 + s.seed); S([34,76,48], 0.7 + 0.5 * n, [76,140,84], 1, "&%@".charAt(Math.floor(n * 3) % 3), 0); return true; }
+      if (Math.abs(u - 0.5) < 0.06 && v > 0.45) { S([70,54,40], 1, [100,76,56], 1, "|", 0); return true; }
+      if (v > 0.5 && v < 0.96) { const k = Math.floor(u * 12); if (hash(k + s.seed, 3) > 0.55 && ((u * 12) % 1) < 0.35 && v < 0.5 + 0.4 * hash(k, 5)) { S([40,96,52], 1, [90,170,92], 1, "|", 0); return true; } }
+      if (v > 0.88 && Math.abs(Math.abs(u - 0.5) - 0.15) < 0.05) { S([70,54,40], 1, [100,76,56], 1, "/", 0); return true; }
+      return false;
+    }
+    case "reeds": {
+      for (let k = 0; k < 5; k++) {
+        const sx = 0.12 + 0.19 * k + 0.03 * Math.sin(T * 1.5 + k + s.seed), top = 0.1 + 0.15 * ((k * 7 + s.seed) % 3);
+        if (Math.abs(u - sx) < 0.035 && v > top) { if (v < top + 0.14 && k % 2 === 0) S([110,70,40], 1, [150,100,60], 1, "#", 0); else S([80,120,60], 1, [140,190,100], 1, "|", 0); return true; }
+      }
+      return false;
+    }
+    case "lily": {
+      const ex = (u - 0.5) / 0.46, ey = (v - 0.62) / 0.3;
+      if (ex * ex + ey * ey < 1) { if (Math.abs(u - 0.62) < 0.07 && v > 0.45 && v < 0.62 && s.seed % 3 === 0) { S([240,150,190], 1, [255,220,235], 1, "*", 0); return true; } S([40,110,56], 0.9, [90,170,90], 1, "o", 0); return true; }
+      return false;
+    }
+    case "pillar": {
+      const cap = !s.broken && v < 0.1;
+      if (cap ? Math.abs(u - 0.5) < 0.3 : Math.abs(u - 0.5) < 0.2) {
+        const top = s.broken ? 0.16 + 0.22 * hash(Math.floor(u * 9) + s.seed, 1) : 0;
+        if (v > top) { const des = LV.bio && LV.bio[Math.floor(s.y) * MW + Math.floor(s.x)] === 1, base = des ? [204,178,128] : [140,136,126], l = clamp(1.15 - (u - 0.5) * 1.2, 0.7, 1.2); S(base, 0.85 * l, base, 1.15 * l, (Math.floor(v * 10) & 1) ? "|" : ":", 0); return true; }
+      }
+      return false;
+    }
+    case "orepick": { const ex = (u - 0.5) / 0.46, ey = (v - 0.62) / 0.34; if (v > 0.28 && ex * ex + ey * ey < 1) { const k = hash(u * 10 + s.seed, v * 10); if (k > 0.55) S([96,86,80], 1, [232,142,84], 1, "*", 0); else S([84,78,74], 1, [140,132,126], 1, ":", 0); return true; } return false; }
+    case "goldpick": { const ex = (u - 0.5) / 0.46, ey = (v - 0.62) / 0.34; if (v > 0.28 && ex * ex + ey * ey < 1) { const k = hash(u * 10 + s.seed, v * 10); S([200,160,40], 1, [255,240,150], 1, k > 0.5 ? "*" : "o", 1); return true; } return false; }
+    case "minecart": {
+      if (v > 0.78 && (Math.abs(u - 0.28) < 0.09 || Math.abs(u - 0.72) < 0.09)) { S([40,40,46], 1, [130,130,140], 1, "O", 0); return true; }
+      if (v > 0.38 && v <= 0.8 && u > 0.04 && u < 0.96) { const rim = v < 0.46 || u < 0.1 || u > 0.9; S(rim ? [96,70,50] : [76,56,40], 1, [140,106,76], 1, rim ? "=" : "|", 0); return true; }
+      if (v > 0.2 && v <= 0.38 && u > 0.14 && u < 0.86 && v > 0.3 - 0.15 * Math.sin((u - 0.14) * 4.4)) { const k = hash(u * 12 + s.seed, v * 12); S([96,86,80], 1, k > 0.6 ? [232,142,84] : [140,132,126], 1, k > 0.6 ? "*" : ":", 0); return true; }
+      return false;
+    }
+    case "beam": { if (Math.abs(u - 0.5) < 0.2 && v > 0.03) { S([110,76,44], 0.9 + 0.2 * hash(u * 10, v * 20), [150,108,66], 1, "|", 0); return true; } if (v < 0.07) { S([96,66,38], 1, [140,100,60], 1, "=", 0); return true; } return false; }
+    case "fireball": { const r = Math.hypot(u - 0.5, v - 0.5); if (r < 0.46) { const k = 1 - r / 0.46; S([255, 120 + 120 * k, 20 + 60 * k], 1, [255,250,200], 1, k > 0.5 ? "@" : "*", 1); return true; } return false; }
+    case "orb": {
+      if (v > 0.58 && u > 0.2 && u < 0.8) { S([120,116,130], 1, [90,86,100], 1, "#", 0); return true; }
+      if (Math.hypot((u - 0.5) / 0.32, (v - 0.32) / 0.28) < 1) { const k = 0.5 + 0.5 * Math.sin(T * 2 + u * 8 + v * 6); S([140 + 60 * k, 90, 230], 1, [230,200,255], 1, k > 0.6 ? "*" : ".", 1); return true; }
+      return false;
+    }
+    case "cauldron": {
+      if (v > 0.35 && v < 0.95 && Math.abs((u - 0.5) / 0.5) < 1 - 0.3 * (v - 0.35)) {
+        if (v < 0.45) { S([60,200,90], 1, [160,255,170], 1, hash(u * 12 + Math.floor(T * 3), v * 12) > 0.6 ? "o" : ".", 1); return true; }
+        S([36,34,40], 1, [80,78,90], 1, "#", 0); return true;
+      }
+      if (v > 0.93 && (Math.abs(u - 0.2) < 0.1 || Math.abs(u - 0.8) < 0.1)) { S([36,34,40], 1, [80,78,90], 1, "|", 0); return true; }
+      return false;
+    }
+    case "boat": {
+      const ex = (u - 0.5) / 0.5, rim = 0.64 - 0.1 * ex * ex, bot = 0.8 + 0.14 * (1 - ex * ex);
+      if (v > rim && v < bot && Math.abs(ex) < 1) { const pl = Math.floor(v * 14) & 1; S(v < rim + 0.05 ? [96,62,34] : [146,96,52], pl ? 0.9 : 1.05, [190,140,84], 1, pl ? "=" : "-", 0); return true; }
+      if (Math.abs(u - 0.5) < 0.018 && v > 0.04 && v <= rim) { S([100,70,44], 1, [140,100,64], 1, "|", 0); return true; }
+      if (v > 0.1 && v < 0.58 && u > 0.52 && u < 0.52 + 0.4 * ((v - 0.08) / 0.5)) { S([240,236,224], 1 - 0.1 * (u - 0.5), [200,196,184], 1, (Math.floor(v * 9) & 1) ? "-" : " ", 0); return true; }
+      if (v < 0.1 && v > 0.04 && u > 0.5 && u < 0.62) { S([220,60,60], 1, [255,150,140], 1, ">", 0); return true; }
+      return false;
+    }
     case "fountain": {
       const be = (u - 0.5) / 0.5, bey = (v - 0.84) / 0.16, r2 = be * be + bey * bey;
       if (v > 0.68 && r2 < 1) {
@@ -1199,7 +1540,7 @@ function spritePixel(s, u, v) {
     case "spire": {
       const t = (v - 0.03) / 0.97;
       if (v < 0.05 && Math.abs(u - 0.5) < 0.05) { S([255,210,90], 1, [255,240,160], 1, "o", 1); return true; }
-      if (t > 0 && Math.abs(u - 0.5) <= 0.5 * t + 0.02) { const l = clamp(1.15 - (u - 0.5) * 0.9, 0.7, 1.2); S(TOWER_ROOF, 0.9 * l, TOWER_ROOF, 1.5 * l, (Math.floor(v * 14) & 1) ? "=" : "-", 0); if (LV.type === "over" && W.snowG > 0.05) snowTint(W.snowG * 0.7); return true; }
+      if (t > 0 && Math.abs(u - 0.5) <= 0.5 * t + 0.02) { const l = clamp(1.15 - (u - 0.5) * 0.9, 0.7, 1.2); S(s.col || TOWER_ROOF, 0.9 * l, s.col || TOWER_ROOF, 1.5 * l, (Math.floor(v * 14) & 1) ? "=" : "-", 0); if (LV.type === "over" && W.snowG > 0.05) snowTint(W.snowG * 0.7); return true; }
       return false;
     }
     case "chimney": {
@@ -1327,16 +1668,17 @@ function drawWeather() {
     for (let i = 0; i < n; i++) {
       const hx = hash(i, 17), hy = hash(i, 31), sp = 1.5 + hash(i, 7) * 0.9;
       const y = Math.floor(((hy * ROWS + T * ROWS * sp) % ROWS + ROWS) % ROWS), x = Math.floor(((hx * COLS + y * sl) % COLS + COLS) % COLS), j = y * COLS + x;
-      chB[j] = sl > 0.1 ? 47 : 124; fgB[j] = c;
-      if (y > 0) { const j2 = j - COLS; if (chB[j2] === 32) { chB[j2] = 124; fgB[j2] = c; } }
+      chB[j] = sl > 0.1 ? 47 : 124; fgB[j] = c; if (PIXEL) bgB[j] = c;
+      for (let k = 1, tr = PIXEL ? 3 : 1; k <= tr && y - k >= 0; k++) { const j2 = j - COLS * k; if (chB[j2] === 32 || PIXEL) { chB[j2] = 124; fgB[j2] = c; if (PIXEL) bgB[j2] = c; } }
     }
   }
-  if (W.snow > 0.03) {
-    const n = Math.floor(W.snow * COLS * 0.7), c = pack(250 * vis, 252 * vis, 255 * vis);
+  const snI = Math.max(W.snow, BZW[2] * 0.4);
+  if (snI > 0.03) {
+    const n = Math.floor(snI * COLS * 0.7), c = pack(250 * vis, 252 * vis, 255 * vis);
     for (let i = 0; i < n; i++) {
       const hx = hash(i, 51), hy = hash(i, 73), sp = 0.1 + hash(i, 9) * 0.12;
       const y = Math.floor(((hy * ROWS + T * ROWS * sp) % ROWS + ROWS) % ROWS), x = Math.floor(((hx * COLS + Math.sin(T * 0.9 + i) * 2 + T * W.wind * 3) % COLS + COLS) % COLS), j = y * COLS + x;
-      chB[j] = i % 3 === 0 ? 42 : (i % 3 === 1 ? 46 : 111); fgB[j] = c;
+      chB[j] = i % 3 === 0 ? 42 : (i % 3 === 1 ? 46 : 111); fgB[j] = c; if (PIXEL) bgB[j] = c;
     }
   }
 }
@@ -1391,6 +1733,151 @@ function drawBow() {
   }
 }
 
+const BZW = [0, 0, 0, 0];
+function floorMine(i, wx, wy, d) {
+  const ix = Math.floor(wx), iy = Math.floor(wy), ft = fgrid[iy]?.[ix] || "cave", n = hash(wx * 5, wy * 5), glow = lampGlow(wx, wy), fx = wx - ix, fy = wy - iy;
+  if (ft === "puddle") {
+    const w1 = Math.sin(wx * 3 + T * 1.1) + Math.sin(wy * 3.4 - T * 0.9);
+    S([26,60,96], 0.85 + 0.15 * w1, [110,170,210], 1, w1 > 1.2 ? "~" : "-", 0);
+  } else {
+    const c = 0.85 + 0.3 * hash(wx * 2.2, wy * 2.2);
+    S([82,74,66], c, [112,102,92], 1, n > 0.86 ? "." : (n > 0.72 ? ":" : " "), 0);
+    if (ft === "railH" || ft === "railV") {
+      const along = ft === "railH" ? fx : fy, across = ft === "railH" ? fy : fx;
+      if (Math.abs(across - 0.3) < 0.055 || Math.abs(across - 0.7) < 0.055) S([132,136,146], 1, [200,204,214], 1, "=", 0);
+      else if ((along * 3) % 1 < 0.18 && across > 0.2 && across < 0.8) S([104,70,42], 1, [74,48,28], 1, "-", 0);
+    }
+  }
+  let sh = 1;
+  if (SOLID.includes(tileAt(wx + 0.3, wy)) || SOLID.includes(tileAt(wx - 0.3, wy)) || SOLID.includes(tileAt(wx, wy + 0.3)) || SOLID.includes(tileAt(wx, wy - 0.3))) sh = 0.78;
+  putCell(i, sCh, sBg, sFg, fogOf(d), sh, glow, 0);
+}
+function ceilPixel(i, wx, wy, d) {
+  const glow = lampGlow(wx, wy), n = hash(wx * 5, wy * 5);
+  if (LV.type === "house") {
+    if (LV.magic) {
+      const star = hash(Math.floor(wx * 3), Math.floor(wy * 3)) > 0.93;
+      if (star) S([40,34,70], 1, [200,170,255], 1, "*", 1); else S([62,56,84], 0.8 + 0.3 * n, [90,82,116], 1, n > 0.8 ? ":" : " ", 0);
+    } else {
+      const bx = ((wx % 1.6) + 1.6) % 1.6, seam = ((wy * 5) % 1) < 0.08;
+      if (bx < 0.18) S([80,52,30], 1, [110,74,44], 1, "#", 0);
+      else S([146,104,64], seam ? 0.7 : 0.9 + 0.2 * hash(Math.floor(wy * 5), 4), [118,82,50], 1, seam ? "_" : "=", 0);
+    }
+  } else if (LV.mine) {
+    const bx = ((wx % 3) + 3) % 3;
+    if (bx < 0.2) S([92,62,36], 1, [120,84,50], 1, "#", 0); else S([62,56,52], 0.8 + 0.3 * n, [96,88,82], 1, n > 0.9 ? "V" : (n > 0.72 ? ":" : " "), 0);
+  } else {
+    S([76,68,64], 0.8 + 0.3 * n, [112,102,96], 1, n > 0.93 ? "V" : (n > 0.75 ? ":" : " "), 0);
+  }
+  putCell(i, sCh, sBg, sFg, fogOf(d), 0.85, glow, sEm);
+}
+function mineRockTex(hd, u, hh) {
+  const n = hash(u * 20 + hd.mx * 3, hh * 16 + hd.my * 5), band = Math.sin(hh * 7 + hash(hd.mx, hd.my) * 6 + u);
+  if (hash(hd.mx * 3 + 1, hd.my * 5 + 2) > 0.8) {
+    if (u < 0.09 || u > 0.91) { S([112,76,44], 1, [78,52,30], 1, "|", 0); return; }
+    if (hh > LV.ceil - 0.35 && hh < LV.ceil - 0.1) { S([100,68,40], 1, [70,46,26], 1, "=", 0); return; }
+    if (((u * 5) % 1) < 0.12) { S([128,88,50], 1, [90,60,36], 1, "|", 0); return; }
+    S([48,42,38], 0.9 + 0.2 * n, [70,62,56], 1, n > 0.7 ? ":" : " ", 0); return;
+  }
+  const k = hash(hd.mx * 7 + Math.floor(u * 3), hd.my * 5 + Math.floor(hh * 3));
+  if (k > 0.955 && n > 0.35) { S([150,92,58], 1, [214,140,90], 1, "*", 0); return; }
+  if (k < 0.012 && n > 0.4) { S([230,190,70], 1, [255,240,150], 1, "*", 1); return; }
+  S([88,80,76], (band > 0 ? 1 : 0.82) * (0.85 + 0.3 * n), [124,114,106], 1, n > 0.72 ? ":" : (n > 0.55 ? "." : " "), 0);
+}
+function stairsTex(hd, u, hh) {
+  const down = hd.tile === "S";
+  if (u > 0.12 && u < 0.88 && hh < 2.2) {
+    if (u < 0.18 || u > 0.82 || hh > 2.1) { S([104,70,40], 1, [70,46,26], 1, "|", 0); return; }
+    const st = Math.floor(hh * 5);
+    if (down) { const k = hh / 2.0; S([20 + 14 * (st & 1), 16 + 10 * (st & 1), 14], 0.55 + 0.45 * k, [60,50,44], 1, (st & 1) ? "=" : "_", 1); return; }
+    const k = 0.5 + 0.5 * hh / 2.0; S([200 * k, 190 * k, 150 * k], 1, [255,250,210], 1, (st & 1) ? "=" : "-", 1); return;
+  }
+  mineRockTex(hd, u, hh);
+}
+function mineMouthTex(hd, u, hh) {
+  if (u > 0.14 && u < 0.86 && hh < 2.0) {
+    if (u < 0.22 || u > 0.78 || hh > 1.86) { S([118,80,44], 1, [80,54,30], 1, "|", 0); return; }
+    if (hh < 0.1 && (Math.abs(u - 0.4) < 0.025 || Math.abs(u - 0.6) < 0.025)) { S([150,152,160], 1, [220,224,232], 1, "=", 0); return; }
+    const g = clamp(hh / 1.8, 0, 1) * 0.35 + 0.65; S([12,10,10], g, [30,24,22], 1, " ", 1); return;
+  }
+  rockTex(hd, u, hh, false);
+}
+function mageTex(hd, hh) {
+  const u = hd.u, n = hash(u * 12 + hd.mx * 3, hh * 9 + hd.my * 5), row = Math.floor(hh * 2.6), bx = (u * 2 + (row & 1) * 0.5) % 1;
+  for (const wl of [1.9, 3.5]) {
+    if (u > 0.3 && u < 0.7 && hh > wl && hh < wl + 0.9) {
+      const ar = hh > wl + 0.6 ? (u - 0.5) * (u - 0.5) / 0.04 + ((hh - wl - 0.6) / 0.3) * ((hh - wl - 0.6) / 0.3) : 0;
+      if (ar < 1) {
+        if (u < 0.34 || u > 0.66 || hh < wl + 0.06 || ar > 0.7) { S([60,46,90], 1, [150,120,200], 1, "#", 0); return; }
+        const k = 0.6 + 0.4 * Math.sin(T * 2 + hh * 5); S([150 * k + 40, 90 * k + 30, 255], 1, [235,215,255], 1, n > 0.6 ? ":" : ".", 1); return;
+      }
+    }
+  }
+  if (hh > 0.9 && hh < 1.0 && (Math.floor(u * 8 + hd.mx) & 1)) { S([70,60,100], 1, [190,140,255], 1, "+", 1); return; }
+  if (hh > 4.8) { S([70,50,110], 1, [130,100,190], 1, "=", 0); return; }
+  if (bx < 0.06 || ((hh * 2.6) % 1) < 0.08) { S([44,40,60], 1, [70,62,92], 1, "+", 0); return; }
+  S([88,82,108], 0.82 + 0.3 * n, [124,116,152], 1, n > 0.72 ? ":" : (n > 0.5 ? "." : " "), 0);
+}
+function mageDoorTex(hd, hh) {
+  const u = hd.u;
+  if (u > 0.2 && u < 0.8 && hh < 1.9) {
+    const top = 1.3 + 0.55 * Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.5) / 0.3, 2)));
+    if (hh < top) {
+      if (u < 0.26 || u > 0.74 || hh > top - 0.1) { S([150,110,230], 1, [230,200,255], 1, "#", 1); return; }
+      if (Math.abs(u - 0.64) < 0.035 && Math.abs(hh - 0.6) < 0.05) { S([190,150,255], 1, [255,240,255], 1, "o", 1); return; }
+      S([70,48,36], 0.85 + 0.15 * (Math.floor(u * 9) & 1), [110,78,52], 1, "|", 0); return;
+    }
+  }
+  if (hh < 0.1 && u > 0.1 && u < 0.9) { S([150,146,160], 1, [110,106,124], 1, "=", 0); return; }
+  mageTex(hd, hh);
+}
+function ruinTex(hd, u, hh) {
+  const des = LV.bio && LV.bio[hd.my * MW + hd.mx] === 1;
+  const row = Math.floor(hh * 2.2), bx = (u * 2 + (row & 1) * 0.5) % 1, n = hash(Math.floor(u * 4) + hd.mx * 9, row + hd.my * 5), base = des ? [204,178,128] : [136,132,122];
+  if (bx < 0.07 || ((hh * 2.2) % 1) < 0.09) { S(base, 0.55, base, 0.7, "+", 0); return; }
+  if (!des && n > 0.7 && hh < 1.6) { S([60,100,56], 0.9, [96,150,84], 1, "\"", 0); return; }
+  S(base, 0.85 + 0.3 * n, base, 1.15, n > 0.6 ? ":" : ".", 0);
+}
+function golemPx(s, u, v) {
+  const cx = u - 0.5, ax = Math.abs(cx), l = clamp(1.1 - cx * 0.4, 0.75, 1.15), n = hash(u * 12 + s.seed, v * 12), G = [118,110,102];
+  let ok = true;
+  if (v >= 0.02 && v < 0.25 && ax < 0.17) { if (v >= 0.1 && v < 0.16 && ax > 0.04 && ax < 0.12) S([30,14,8], 1, [255,150,40], 1, "o", 1); else S(G, l * (0.82 + 0.3 * n), [160,152,144], 1, n > 0.7 ? ":" : "#", 0); }
+  else if (v >= 0.25 && v < 0.62 && ax < 0.3) {
+    if (Math.abs(ax - 0.08 - 0.06 * Math.sin(v * 16 + s.seed)) < 0.012) S([60,20,6], 1, [255,140,30], 1, "|", 1);
+    else S(G, l * (0.8 + 0.3 * n), [150,142,134], 1, n > 0.65 ? ":" : "%", 0);
+  }
+  else if (v >= 0.27 && v < 0.8 && ax >= 0.3 && ax < 0.47) S(G, l * 0.9 * (0.8 + 0.3 * n), [140,132,124], 1, n > 0.6 ? ":" : "#", 0);
+  else if (v >= 0.62 && ax >= 0.03 && ax < 0.27) { const side = cx < 0 ? -1 : 1, lift = Math.max(0, (s.moving ? Math.sin(s.phase) : 0) * side) * 0.06; if (v > 1 - lift) ok = false; else S(G, l * 0.85 * (0.8 + 0.3 * n), [130,122,114], 1, "#", 0); }
+  else ok = false;
+  if (ok && s.flash > 0) { mix(sBg, sBg, [255,255,255], 0.65); mix(sFg, sFg, [255,255,255], 0.65); sEm = 1; }
+  return ok;
+}
+function drawStaff() {
+  const rec = P.shotAnim > 0 ? P.shotAnim / 0.25 : 0, th = 0.32 + 0.03 * Math.sin(T * 2) - 0.3 * rec, bob = P.moving ? Math.sin(T * 8) * cv.height * 0.008 : 0;
+  const pvx = cv.width * 0.8, pvy = cv.height * 1.04 + bob, len = cv.height * 0.8, wid = cv.height * 0.022, orbR = cv.height * 0.075;
+  const ax = -Math.sin(th), ay = -Math.cos(th), qx = Math.cos(th), qy = -Math.sin(th), ox = pvx + ax * len, oy = pvy + ay * len;
+  for (let y = 0; y < ROWS; y++) for (let x = Math.floor(COLS * 0.3); x < COLS; x++) {
+    const rx = (x + 0.5) * cw - pvx, ry = (y + 0.5) * LH - pvy, a = rx * ax + ry * ay, b = rx * qx + ry * qy;
+    const dOrb = Math.hypot((x + 0.5) * cw - ox, (y + 0.5) * LH - oy);
+    let ok = false, em = 0;
+    if (dOrb < orbR) { const k = 1 - dOrb / orbR; S([255, 90 + 140 * k, 20 + 40 * k], 1, [255,250,200], 1, k > 0.5 ? "@" : "*", 1); ok = true; em = 1; }
+    else if (a > 0 && a < len - orbR * 0.6 && Math.abs(b) < wid * (1 - 0.2 * a / len)) { S([118,78,42], 0.9 + 0.2 * Math.sin(a * 0.2), [168,118,70], 1, "|", 0); ok = true; }
+    else if (a > 0 && a < len * 0.14 && Math.abs(b) < wid * 2.4) { S([216,168,128], 1, [180,130,96], 1, ".", 0); ok = true; }
+    if (ok) putCell(y * COLS + x, sCh, sBg, sFg, 0, 1, 0, em);
+  }
+}
+function drawBoat() {
+  const y0 = Math.floor(ROWS * 0.8);
+  for (let y = y0; y < ROWS; y++) {
+    const k = (y - y0) / Math.max(1, ROWS - y0), hw = COLS * (0.07 + 0.55 * k), lx = COLS / 2 - hw, rx = COLS / 2 + hw;
+    for (let x = Math.max(0, Math.floor(lx)); x <= Math.min(COLS - 1, Math.ceil(rx)); x++) {
+      const edge = x < lx + 1.4 || x > rx - 1.4, pl = Math.floor((x - COLS / 2) / Math.max(1, hw / 4)) & 1;
+      if (edge) S([86,54,28], 1, [130,90,52], 1, "#", 0); else S([150,100,54], pl ? 0.88 : 1.02, [196,146,88], 1, (y & 1) ? "=" : "-", 0);
+      putCell(y * COLS + x, sCh, sBg, sFg, 0, 1, 0, 0);
+    }
+  }
+}
+
 // ============================================================
 //  FRAME
 // ============================================================
@@ -1401,7 +1888,7 @@ function bodyCol(az, hz) {
 }
 function render(dt) {
   T += dt; envUpdate();
-  EYE = EYE0 + pz - (P.dodgeT > 0 ? 0.28 * Math.sin(Math.PI * (1 - P.dodgeT / 0.24)) : 0);
+  EYE = EYE0 + pz - (P.dodgeT > 0 ? 0.28 * Math.sin(Math.PI * (1 - P.dodgeT / 0.24)) : 0) + (P.boat ? 0.14 + 0.04 * Math.sin(T * 2.2) : 0);
   const dirX = Math.cos(ang), dirY = Math.sin(ang), plX = -dirY * TAN, plY = dirX * TAN;
   const hz = Math.round(ROWS * 0.5 + Math.tan(pitch) * PK), over = LV.type === "over", CEIL = LV.ceil;
   const now = new Date();
@@ -1448,12 +1935,13 @@ function render(dt) {
   drawSprites(hz, dirX, dirY, plX, plY);
   drawNums(hz, dirX, dirY, plX, plY);
   drawWeather();
-  if (P.blocking && P.shield) drawShield(); else if (P.wpn === 2 && P.bow) drawBow(); else drawSword();
+  if (P.boat) drawBoat();
+  if (P.blocking && P.shield) drawShield(); else if (P.wpn === 2 && P.bow) drawBow(); else if (P.wpn === 3 && P.staff) drawStaff(); else drawSword();
   present();
   drawMini();
   const ph = $("phase"); if (ph) ph.textContent = phaseName + (autoDay ? "" : " · pausa");
 }
-function present() {
+function presentAscii() {
   for (let y = 0; y < ROWS; y++) {
     const row = y * COLS, yy = y * LH; let x = 0;
     while (x < COLS) {
@@ -1490,9 +1978,9 @@ function buildMini(Lv) {
   for (let y = 0; y < Lv.H; y++) for (let x = 0; x < Lv.W; x++) {
     const t = Lv.grid[y][x], f = Lv.fgrid[y][x]; let col = "#2f6b3a";
     if (Lv.type === "over") {
-      if (t === "~") col = "#1f5f9c"; else if (t === "M") col = "#77746f"; else if (t === "C") col = "#000";
+      if (t === "~") col = "#1f5f9c"; else if (t === "M") col = "#77746f"; else if (t === "C") col = "#000"; else if (t === "N") col = "#3a2a1a"; else if (t === "Y" || t === "G") col = "#8a5cc8"; else if (t === "Z") col = "#a89a78";
       else if (t === "H" || t === "W" || t === "D") col = rgb(Lv.houses[Lv.hid[y][x]].roof); else if (t === "K") col = "#d8c8a8"; else if (t === "h") col = "#1c5a28";
-      else if (f === "path") col = "#b08d57"; else if (f === "plaza") col = "#9aa0ad"; else if (f === "dock") col = "#8a5c30"; else if (f === "sand") col = "#dccb90";
+      else if (f === "path") col = "#b08d57"; else if (f === "plaza") col = "#9aa0ad"; else if (f === "dock") col = "#8a5c30"; else if (f === "sand") col = "#dccb90"; else if (f === "dune") col = "#d8b46a"; else if (f === "snow") col = "#e6eef8"; else if (f === "swamp") col = "#44563a"; else if (f === "bog") col = "#2e4a38"; else if (f === "ruin") col = "#b0a58c";
     } else col = (t === "." ? (f === "puddle" ? "#2f6c9c" : "#6a5a48") : (t === "X" ? "#fff2b0" : "#1a1614"));
     c.fillStyle = col; c.fillRect(x * sc, y * sc, sc, sc);
   }
@@ -1504,12 +1992,15 @@ function drawMini() {
   mini.style.display = "block";
   const mm = buildMini(LV), sc = LV.mmScale;
   if (mini.width !== mm.width) { mini.width = mm.width; mini.height = mm.height; }
+  { const f = Math.min(1, 190 / mm.width); mini.style.width = (mm.width * f) + "px"; mini.style.height = (mm.height * f) + "px"; }
   mctx.drawImage(mm, 0, 0);
   const cx = px * sc, cy = py * sc;
   mctx.fillStyle = "rgba(255,255,255,.22)"; mctx.beginPath(); mctx.moveTo(cx, cy);
   mctx.lineTo(cx + Math.cos(ang - FOVH / 2) * 22, cy + Math.sin(ang - FOVH / 2) * 22); mctx.lineTo(cx + Math.cos(ang + FOVH / 2) * 22, cy + Math.sin(ang + FOVH / 2) * 22);
   mctx.closePath(); mctx.fill();
   for (const z of LV.act) if (z.mob && !(z.dead > 0) && Math.hypot(z.x - px, z.y - py) < 12) { mctx.fillStyle = z.type === "boss" ? "#ff3030" : (z.type === "zombie" ? "#7fe06a" : "#ff9a50"); mctx.fillRect(z.x * sc - 1, z.y * sc - 1, 3, 3); }
+  for (const q of (WORLD.pawns || [])) if (q.following && q.lv === LV) { mctx.fillStyle = "#6aa8ff"; mctx.fillRect(q.x * sc - 1, q.y * sc - 1, 3, 3); }
+  if (LV.boat && !LV.boat.hidden) { mctx.fillStyle = "#6fe0ff"; mctx.fillRect(LV.boat.x * sc - 2, LV.boat.y * sc - 2, 4, 4); }
   mctx.fillStyle = "#ffffff"; mctx.beginPath();
   mctx.moveTo(cx + Math.cos(ang) * 4, cy + Math.sin(ang) * 4); mctx.lineTo(cx + Math.cos(ang + 2.5) * 3.2, cy + Math.sin(ang + 2.5) * 3.2); mctx.lineTo(cx + Math.cos(ang - 2.5) * 3.2, cy + Math.sin(ang - 2.5) * 3.2);
   mctx.closePath(); mctx.fill();
@@ -1523,7 +2014,7 @@ const SWORDS = [
   { n: "piedra", dmg: 2, col: [138,140,148], edge: [196,198,208], fg: [96,98,108] },
   { n: "hierro", dmg: 3, col: [198,204,218], edge: [246,248,255], fg: [140,148,168] },
 ];
-const INV = { coin: 0, crystal: 0, mush: 0, arrow: 0 };
+const INV = { coin: 0, crystal: 0, mush: 0, arrow: 0, ore: 0, gold: 0, tome: 0 };
 const MOB = {
   zombie:   { hp: 5,  speed: 1.15, dmg: 1, range: 0.85, cd: 1.15, w: 0.55, h: 1.1,  r: 0.28, coins: [1, 2] },
   skeleton: { hp: 4,  speed: 1.5,  dmg: 1, range: 0,    cd: 2.2,  w: 0.5,  h: 1.1,  r: 0.25, coins: [1, 3] },
@@ -1531,6 +2022,7 @@ const MOB = {
   bat:      { hp: 2,  speed: 3.2,  dmg: 1, range: 0.7,  cd: 1.3,  w: 0.8,  h: 0.4,  r: 0.2,  coins: [0, 1] },
   wolf:     { hp: 6,  speed: 3.3,  dmg: 1, range: 0.95, cd: 1.0,  w: 1.1,  h: 0.7,  r: 0.32, coins: [1, 3] },
   boss:     { hp: 30, speed: 1.0,  dmg: 2, range: 1.6,  cd: 2.6,  w: 1.0,  h: 1.9,  r: 0.5,  coins: [15, 15] },
+  golem:    { hp: 40, speed: 0.9,  dmg: 2, range: 1.8,  cd: 2.6,  w: 1.3,  h: 2.4,  r: 0.55, coins: [25, 25] },
 };
 function mkMob(Lv, type, x, y, seed) {
   const M = MOB[type];
@@ -1538,42 +2030,26 @@ function mkMob(Lv, type, x, y, seed) {
     moving: false, seed: seed || 0, dir: Math.random() * 6.28, dt: Math.random() * 2, idle: false, mode: "idle", rt: 0, wind: 0, sh: type === "spider" ? 0.5 : 0.45 };
   if (type === "zombie") Object.assign(o, { skin: [96,150,88], shirt: [52,98,150], pants: [44,44,92] });
   else if (type === "boss") Object.assign(o, { skin: [74,124,84], shirt: [120,26,44], pants: [52,30,60], crown: true, aggro: false });
+  else if (type === "golem") Object.assign(o, { aggro: false, sh: 0.6 });
   else if (type === "bat") Object.assign(o, { fly: true, z: 1.1, sh: 0 });
   const s = add(Lv, type, x, y, o); Lv.act.push(s); return s;
 }
 function addPick(Lv, type, x, y, pick, o) { const s = add(Lv, type, x, y, Object.assign({ pick, sh: 0.3 }, o || {})); s.pid = Lv.pk++; Lv.picks.push(s); return s; }
 function removeSprite(s) { const k = SPR.indexOf(s); if (k >= 0) SPR.splice(k, 1); }
 
-function blockedFor(x, y, self, r0) {
-  const r = r0 || 0.2;
-  if (solidTile(x - r, y - r) || solidTile(x + r, y - r) || solidTile(x - r, y + r) || solidTile(x + r, y + r)) return true;
-  if (self && self.fly) return false;
-  for (const s of LV.obst) { const dx = x - s.x, dy = y - s.y, rr = s.r + r * 0.8; if (dx * dx + dy * dy < rr * rr) return true; }
-  for (const a of LV.act) {
-    if (a === self || a.hidden || a.dead > 0 || a.fly) continue;
-    const dx = x - a.x, dy = y - a.y, rr = a.r + r * 0.8; if (dx * dx + dy * dy < rr * rr) return true;
-  }
-  return false;
-}
 function triggerAt(x, y) {
   const r = 0.3;
   for (const [ox, oy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) {
     const ix = Math.floor(x + ox), iy = Math.floor(y + oy);
     if (ix < 0 || iy < 0 || ix >= MW || iy >= MH) continue;
     const t = grid[iy][ix];
-    if (t === "D" || t === "C" || t === "X") return { t, mx: ix, my: iy };
+    if ("DCXNGSU".includes(t)) return { t, mx: ix, my: iy };
   }
   return null;
 }
 function fadeFlash() {
   const f = $("fade"); f.style.transition = "none"; f.style.opacity = 1;
   requestAnimationFrame(() => { f.style.transition = "opacity .7s"; f.style.opacity = 0; });
-}
-function doTrigger(tr) {
-  if (LV.type === "over") {
-    if (tr.t === "D") { const h = LV.houses[hid[tr.my][tr.mx]]; if (h) { const lv = h.level; lv.ret.lvl = LV; goto(lv, lv.spawn.x, lv.spawn.y, lv.spawn.ang); } }
-    else if (tr.t === "C") { const lv = LV.caveLevel; lv.ret.lvl = LV; goto(lv, lv.spawn.x, lv.spawn.y, lv.spawn.ang); }
-  } else if (tr.t === "X") { const r = LV.ret; goto(r.lvl, r.x, r.y, r.ang); }
 }
 let msgTimer = 0;
 function say(text, ms) { const m = $("msg"); m.textContent = text; m.style.opacity = 1; msgTimer = (ms || 3500) / 1000; }
@@ -1586,21 +2062,13 @@ const LINES = [
   () => "De noche salen los lobos. Los faroles los mantienen a raya.",
   () => "Los hongos rojos del bosque curan un poco. Come uno con Q.",
   () => "El reloj de la torre nunca se atrasa. Es lo único que funciona bien aquí.",
+  () => "Hay un bote atracado en el muelle de la costa. Más allá del mar hay islas: unas ruinas, una torre y quizá un tesoro.",
+  () => "Dicen que en la montaña hay una mina muy profunda, con rieles y un golem al fondo.",
+  () => "El desierto pincha, la tundra congela y el pantano frena. Elige bien por dónde caminas.",
 ];
 function caveDir() {
   const ov = LV.type === "over" ? LV : (LV.ret && LV.ret.lvl) || LV, cd = ov.caveDoor, v = ov.houses[0], dx = cd.x - (v.x + 13), dy = cd.y - (v.y + 8);
   return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "este" : "oeste") : (dy > 0 ? "sur" : "norte");
-}
-function nearInteract() {
-  let best = null, bd = 9;
-  for (const a of LV.act) {
-    if (a.type !== "villager" || a.hidden) continue;
-    const dx = a.x - px, dy = a.y - py, d = Math.hypot(dx, dy);
-    if (d < 2.0 && (dx * Math.cos(ang) + dy * Math.sin(ang)) / (d || 1) > 0.55 && d < bd) { bd = d; best = a; }
-  }
-  const ch = LV.chest;
-  if (ch && !ch.open) { const dx = ch.x - px, dy = ch.y - py, d = Math.hypot(dx, dy); if (d < 1.8 && (dx * Math.cos(ang) + dy * Math.sin(ang)) / (d || 1) > 0.5 && d < bd) best = ch; }
-  return best;
 }
 const OFFERS = [
   { id: "stone", cost: 8,  name: "espada de piedra", ok: () => P.sword < 1 },
@@ -1628,45 +2096,17 @@ function drawHearts() {
   let s = ""; for (let i = 0; i < P.max; i++) s += '<span class="' + (i < P.hp ? "f" : "e") + '">♥</span>';
   $("hearts").innerHTML = s;
 }
-function drawInv() {
-  const tc = ["#c8965a", "#b8bcc8", "#f4f6ff"][P.sword];
-  let s = '<span class="sl' + (P.wpn === 1 ? " on" : "") + '" style="color:' + tc + '">1 ⚔</span>';
-  if (P.bow) s += '<span class="sl' + (P.wpn === 2 ? " on" : "") + '">2 ➶</span>';
-  if (P.shield) s += '<span class="sl">K ⛨</span>';
-  s += '<span class="it" style="color:#ffd75e">● ' + INV.coin + '</span>';
-  if (INV.crystal) s += '<span class="it" style="color:#b9a2ff">◆ ' + INV.crystal + '</span>';
-  if (INV.mush) s += '<span class="it" style="color:#ff8c7a">♣ ' + INV.mush + '</span>';
-  if (P.bow) s += '<span class="it" style="color:#e8d8b8">➳ ' + INV.arrow + '</span>';
-  $("inv").innerHTML = s;
-}
 
 // ---- combate del jugador ----
-function fireArrow(x, y, z, tx, ty, tz, speed, from) {
+function fireArrow(x, y, z, tx, ty, tz, speed, from, dmg) {
   const dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy) || 1, t = d / speed;
-  const a = add(LV, "arrow", x, y, { w: 0.5, h: 0.12, z, sh: 0, vx: dx / d * speed, vy: dy / d * speed, vz: (tz - z) / t + 0.8 * t, life: 3, from });
+  const a = add(LV, "arrow", x, y, { w: 0.5, h: 0.12, z, sh: 0, vx: dx / d * speed, vy: dy / d * speed, vz: (tz - z) / t + 0.8 * t, life: 3, from, dmg });
   LV.prj.push(a);
 }
 function dropLoot(a) {
   const M = MOB[a.type], n = M.coins[0] + Math.floor(Math.random() * (M.coins[1] - M.coins[0] + 1));
   for (let k = 0; k < n; k++) addPick(LV, "coin", a.x + (Math.random() - 0.5) * (n > 3 ? 2 : 0.8), a.y + (Math.random() - 0.5) * (n > 3 ? 2 : 0.8), "coin", { w: 0.4, h: 0.4, z: 0.25, sh: 0 });
   if (a.type === "skeleton" && Math.random() < 0.6) addPick(LV, "arrowpick", a.x, a.y, "arrow", { w: 0.6, h: 0.5, z: 0.1, sh: 0 });
-}
-function updateProjectiles(dt) {
-  for (let i = LV.prj.length - 1; i >= 0; i--) {
-    const a = LV.prj[i];
-    a.x += a.vx * dt; a.y += a.vy * dt; a.vz -= 1.6 * dt; a.z += a.vz * dt; a.life -= dt;
-    let gone = a.life <= 0 || a.z < 0 || solidTile(a.x, a.y) || a.z > (LV.type === "over" ? 30 : LV.ceil);
-    if (!gone && a.from === "player") {
-      for (const m of LV.act) {
-        if (!m.mob || m.dead > 0 || m.hidden) continue;
-        const base = m.fly ? m.z : 0;
-        if (Math.hypot(m.x - a.x, m.y - a.y) < m.r + 0.18 && a.z >= base - 0.15 && a.z <= base + m.h + 0.15) { damageMob(m, a.dmg || 2, a.vx * 0.03, a.vy * 0.03); gone = true; break; }
-      }
-    } else if (!gone && a.from === "enemy" && !P.dead) {
-      if (Math.hypot(px - a.x, py - a.y) < 0.4 && a.z > pz - 0.1 && a.z < EYE + 0.2) { hurtP(1, a.x - a.vx * 0.2, a.y - a.vy * 0.2, "arrow"); gone = true; }
-    }
-    if (gone) { LV.prj.splice(i, 1); removeSprite(a); }
-  }
 }
 function updateWolves(dt) {
   if (LV.type !== "over" || P.dead || !LV.vill) return;
@@ -1678,7 +2118,7 @@ function updateWolves(dt) {
       for (let k = 0; k < 14; k++) {
         const a = Math.random() * 6.28, r = 15 + Math.random() * 9, x = px + Math.cos(a) * r, y = py + Math.sin(a) * r, v = LV.vill;
         if (x > v.x0 && x < v.x1 && y > v.y0 && y < v.y1) continue;
-        if (ftAt(x, y) !== "grass" || blockedFor(x, y, null, 0.3)) continue;
+        if (!["grass", "snow"].includes(ftAt(x, y)) || blockedFor(x, y, null, 0.3)) continue;
         mkMob(LV, "wolf", x, y, k); break;
       }
     }
@@ -1716,88 +2156,14 @@ function villagerAI(a, dt) {
   const ok = moveActor(a, dx / d * sp, dy / d * sp, 0.2);
   a.moving = ok; a.stuck = ok ? Math.max(0, a.stuck - dt) : a.stuck + dt; a.phase += dt * 5;
 }
-function mobAI(a, dt) {
-  const M = MOB[a.type];
-  if (a.dead > 0) { a.dead += dt * 1.3; return; }
-  if (a.flash > 0) a.flash -= dt;
-  a.cd -= dt;
-  const dx = px - a.x, dy = py - a.y, d = Math.hypot(dx, dy) || 0.001, ux = dx / d, uy = dy / d;
-  const range = a.type === "wolf" ? 18 : a.type === "skeleton" ? 13 : 9;
-  const seen = !P.dead && d < range && los(a.x, a.y, px, py), rr = M.r - 0.04;
-  switch (a.type) {
-    case "zombie":
-      if (seen) { a.moving = true; a.phase += dt * 6;
-        if (d > M.range) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr);
-        else if (a.cd <= 0) { a.cd = M.cd; hitPlayer(M.dmg, a, 0.35); } }
-      else wander(a, dt, 0.35, rr);
-      break;
-    case "boss": {
-      if (!a.aggro && seen && d < 10) a.aggro = true;
-      if (!a.aggro) { a.moving = false; break; }
-      const enr = a.hp < a.maxhp * 0.5, sp = M.speed * (enr ? 1.6 : 1) * dt;
-      a.moving = a.wind <= 0; a.phase += dt * 5;
-      if (a.wind > 0) { a.wind -= dt; a.flash = 0.05; if (a.wind <= 0) { if (Math.hypot(px - a.x, py - a.y) < 2.5) hitPlayer(M.dmg, a, 1.1, "slam"); a.cd = enr ? 1.6 : M.cd; } }
-      else if (d > 1.7) moveActor(a, ux * sp, uy * sp, rr);
-      else if (a.cd <= 0) a.wind = 0.6;
-      break;
-    }
-    case "skeleton":
-      if (seen) {
-        a.phase += dt * 4;
-        if (d < 3.4) { a.moving = true; moveActor(a, -ux * M.speed * dt, -uy * M.speed * dt, rr); }
-        else if (d > 8) { a.moving = true; moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr); }
-        else a.moving = false;
-        if (a.cd <= 0 && d < 12) { a.cd = M.cd + Math.random() * 0.8; fireArrow(a.x, a.y, 0.75, px, py, EYE - 0.3, 9, "enemy"); }
-      } else wander(a, dt, 0.4, rr);
-      break;
-    case "spider":
-      if (seen) { a.moving = true; a.phase += dt * 12;
-        if (d > M.range) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr);
-        else if (a.cd <= 0) { a.cd = M.cd; hitPlayer(M.dmg, a, 0.2); } }
-      else wander(a, dt, 0.5, rr);
-      break;
-    case "bat": {
-      a.phase += dt * 10; a.moving = true;
-      const tz = seen && a.mode !== "retreat" ? Math.max(0.3, EYE - 0.45) : 1.1 + 0.35 * Math.sin(T * 3 + a.seed);
-      a.z += (tz - a.z) * Math.min(1, dt * 3);
-      if (a.mode === "retreat") { a.rt -= dt; moveActor(a, -ux * M.speed * dt, -uy * M.speed * dt, 0.18); if (a.rt <= 0) a.mode = "idle"; }
-      else if (seen) { a.mode = "attack";
-        if (d > 0.7) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, 0.18);
-        else if (a.cd <= 0) { a.cd = M.cd; hitPlayer(M.dmg, a, 0.1); a.mode = "retreat"; a.rt = 0.8; } }
-      else { a.dir += dt * 1.4; moveActor(a, Math.cos(a.dir) * 1.4 * dt, Math.sin(a.dir) * 1.4 * dt, 0.18); }
-      break;
-    }
-    case "wolf": {
-      if (NF < 0.3 && d > 12) a.leave = true;
-      if (a.leave) { moveActor(a, -ux * M.speed * dt, -uy * M.speed * dt, rr); a.moving = true; a.phase += dt * 9; if (d > 26 || (NF < 0.15 && d > 14)) { a.hidden = true; a.dead = 2; } break; }
-      if (lampGlow(a.x, a.y) > 0.3) {
-        let lx = 0, ly = 0; for (const l of ACT) { lx += a.x - l[0]; ly += a.y - l[1]; }
-        const ll = Math.hypot(lx, ly) || 1; moveActor(a, lx / ll * M.speed * dt, ly / ll * M.speed * dt, rr); a.moving = true; a.phase += dt * 9; break;
-      }
-      if (seen) { a.moving = true; a.phase += dt * 9;
-        if (d > M.range) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr);
-        else if (a.cd <= 0) { a.cd = M.cd; hitPlayer(M.dmg, a, 0.4); } }
-      else wander(a, dt, 0.8, rr);
-      break;
-    }
-  }
-}
-function updateActors(dt) {
-  for (let i = LV.act.length - 1; i >= 0; i--) {
-    const a = LV.act[i];
-    if (a.dead > 1.4) { LV.act.splice(i, 1); removeSprite(a); continue; }
-    if (a.type === "villager") villagerAI(a, dt); else mobAI(a, dt);
-  }
-}
 
 // ============================================================
 //  EXTRAS v5b: opciones, números de daño, misiones, guardado, menú, táctil
 // ============================================================
 function readJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
 const SAVE_KEY = "asciifps5", OPT_KEY = "asciifps5opts";
-const OPT = Object.assign({ sens: 1, invY: false, font: 12, fov: 74, mini: true, nums: true, auto: true, touch: "auto" }, readJSON(OPT_KEY));
+const OPT = Object.assign({ sens: 1, invY: false, font: 12, fov: 74, mini: true, nums: true, auto: true, touch: "auto", style: "pixel", pxs: 5, dither: false }, readJSON(OPT_KEY));
 function saveOpts() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} }
-function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
 let noteT = 0;
 function note(t) { const n = $("note"); n.textContent = t; n.style.opacity = 1; clearTimeout(noteT); noteT = setTimeout(() => { n.style.opacity = 0; }, 1800); }
 
@@ -1813,6 +2179,7 @@ function drawNums(hz, dirX, dirY, plX, plY) {
     if (ty < 0.3 || ty > 20) continue;
     const tx = inv * (dirY * rx - dirX * ry), col = Math.round((COLS / 2) * (1 + tx / ty)), row = Math.round(hz + (EYE - f.z) * PK / ty);
     if (row < 0 || row >= ROWS) continue;
+    if (PIXEL) { if (col >= 0 && col < COLS && !occluded(col, row, ty)) TXT.push({ x: col * cw, y: row * LH, t: f.txt, c: hex(f.col) }); continue; }
     const n = f.txt.length, x0 = col - (n >> 1);
     for (let k = 0; k < n; k++) {
       const x = x0 + k; if (x < 0 || x >= COLS || occluded(x, row, ty)) continue;
@@ -1837,28 +2204,17 @@ const QUESTS = [
     ask: "Quiero 5 hongos rojos del bosque para una sopa. ¿Los buscas?", hint: "Crecen entre los árboles, fuera del pueblo.", done: "¡Qué buena sopa saldrá!" },
   { id: "king",  title: "El rey zombi",       need: 1, type: "boss", rew: { coin: 60, heart: 1 },
     ask: "Un rey zombi manda en lo más hondo de la cueva. Derrótalo y el pueblo te lo agradecerá siempre.", hint: "Está en el fondo, custodiando un cofre.", done: "¡Eres un héroe! Este es el pago prometido." },
+  { id: "ore",   title: "Mineral de hierro", need: 6, type: "item", item: "ore", rew: { coin: 40, arrow: 8 },
+    ask: "Hay una mina profunda en la montaña y necesito 6 trozos de mineral. ¿Te animas?", hint: "Hay mineral por todo el suelo de la mina.", done: "¡Buen mineral! Esto servirá bastante." },
+  { id: "golem", title: "El golem",          need: 1, type: "golem", rew: { coin: 80, heart: 1 },
+    ask: "Dicen que un golem de roca vive en el último nivel de la mina. Si lo derrotas, el pueblo te debe una.", hint: "Está en el fondo de la mina, junto a un cofre.", done: "¡Increíble! Aquí tienes tu recompensa." },
+  { id: "tome",  title: "El grimorio",       need: 1, type: "item", item: "tome", rew: { coin: 30, staff: true },
+    ask: "Perdí mi grimorio en unas ruinas del desierto, al otro lado del mar. Tráelo y te daré un bastón de fuego.", hint: "Lo guarda el cofre de las ruinas, vigiladas por esqueletos.", done: "¡Mi grimorio! Toma el bastón, te lo has ganado." },
 ];
 const QS = {};
 const qState = q => QS[q.id] ? QS[q.id].state : "new";
 function qProg(q) { const s = QS[q.id]; if (!s) return 0; return Math.min(q.need, q.type === "item" ? INV[q.item] : s.prog); }
 const qReady = q => qState(q) === "active" && qProg(q) >= q.need;
-function onKillQuest(a) {
-  for (const q of QUESTS) {
-    const s = QS[q.id]; if (!s || s.state !== "active") continue;
-    if (q.type === "kill" && a.type !== "wolf" && LV.type === "cave") s.prog++;
-    else if (q.type === "wolf" && a.type === "wolf") s.prog++;
-    else if (q.type === "boss" && a.type === "boss") s.prog++;
-  }
-  drawQuests();
-}
-function giveReward(q) {
-  const r = q.rew, parts = [];
-  if (r.coin) { INV.coin += r.coin; parts.push(r.coin + " monedas"); }
-  if (r.mush) { INV.mush += r.mush; parts.push(r.mush + " hongos"); }
-  if (r.arrow) { INV.arrow += r.arrow; parts.push(r.arrow + " flechas"); }
-  if (r.heart && P.max < 14) { P.max++; P.hp = P.max; parts.push("un corazón extra"); drawHearts(); }
-  drawInv(); return parts.join(", ");
-}
 function questTalk(v) {
   const q = QUESTS[v.qid]; if (!q) return false;
   const st = qState(q);
@@ -1877,49 +2233,11 @@ function drawQuests() {
   let s = ""; for (const q of QUESTS) if (qState(q) === "active") s += '<div class="q' + (qReady(q) ? " ok" : "") + '">◈ ' + q.title + " " + qProg(q) + "/" + q.need + "</div>";
   $("quest").innerHTML = s;
 }
-function updateMarkers() {
-  if (LV.type !== "over") return;
-  for (const v of LV.act) {
-    if (v.type !== "villager" || !v.marker) continue;
-    const q = QUESTS[v.qid], st = q ? qState(q) : "done", m = v.marker;
-    m.x = v.x; m.y = v.y; m.z = 1.2 + 0.06 * Math.sin(T * 3 + v.seed);
-    m.kind = st === "new" ? "!" : (qReady(q) ? "?" : "");
-    m.hidden = !!v.hidden || !m.kind;
-  }
-}
 
 // ---- guardado ----
 function applyTaken(lv, list) {
   lv.taken = (list || []).slice();
   for (let i = lv.picks.length - 1; i >= 0; i--) if (lv.taken.includes(lv.picks[i].pid)) { const s = lv.picks[i]; lv.picks.splice(i, 1); const k = lv.spr.indexOf(s); if (k >= 0) lv.spr.splice(k, 1); }
-}
-function saveGame(manual) {
-  if (P.dead || !WORLD) return false;
-  const lt = LV.type === "house" ? { type: "house", id: LV.pal.id } : { type: LV.type }, c = WORLD.caveLevel;
-  const sv = { v: 1, seed: SEED, dayT, autoDay, weather: W.name, lvl: lt, x: px, y: py, a: ang, hp: P.hp, max: P.max, sta: P.sta, sword: P.sword, shield: P.shield, bow: P.bow, wpn: P.wpn,
-    inv: INV, qs: QS, kills: P.kills, takenO: WORLD.taken, takenC: c.taken, deadM: c.deadM, chest: !!(c.chest && c.chest.open), snowG: W.snowG };
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); } catch (e) { return false; }
-  P.saveT = 0; if (manual) note("Partida guardada"); return true;
-}
-function loadGame() {
-  let sv; try { sv = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
-  if (!sv || sv.v !== 1) return false;
-  let w = null; try { w = genOverworld(sv.seed); } catch (e) { w = null; }
-  if (!w) return false;
-  WORLD = w; SEED = sv.seed; resetPlayer();
-  const c = w.caveLevel;
-  applyTaken(w, sv.takenO); applyTaken(c, sv.takenC);
-  c.deadM = (sv.deadM || []).slice();
-  for (const m of c.act.slice()) if (m.mid !== undefined && c.deadM.includes(m.mid)) { c.act.splice(c.act.indexOf(m), 1); const k = c.spr.indexOf(m); if (k >= 0) c.spr.splice(k, 1); if (m === c.boss) c.boss = null; }
-  if (sv.chest && c.chest) c.chest.open = true;
-  Object.assign(P, { hp: sv.hp, max: sv.max, sta: sv.sta, sword: sv.sword, shield: sv.shield, bow: sv.bow, wpn: sv.wpn, kills: sv.kills || 0 });
-  Object.assign(INV, sv.inv); for (const k in QS) delete QS[k]; Object.assign(QS, sv.qs || {});
-  dayT = sv.dayT; autoDay = sv.autoDay; setWeather(sv.weather); Object.assign(W, WPRE[sv.weather] || WPRE.clear); W.snowG = sv.snowG || 0;
-  const lvl = sv.lvl.type === "house" ? w.houses[sv.lvl.id].level : (sv.lvl.type === "cave" ? c : w);
-  if (lvl !== w) lvl.ret.lvl = w;
-  setLevel(lvl); px = sv.x; py = sv.y; ang = sv.a; pitch = 0;
-  drawHearts(); drawInv(); drawQuests();
-  return true;
 }
 
 // ---- menú / opciones ----
@@ -1948,10 +2266,13 @@ function bindMenu() {
     newArm = 0; $("bNew").textContent = "Mundo nuevo"; try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
     newWorld(Math.floor(Math.random() * 99999) + 1); play();
   };
-  $("oSens").value = Math.round(OPT.sens * 100); $("oInv").checked = OPT.invY; $("oFont").value = OPT.font; $("oFov").value = OPT.fov;
+  $("oSens").value = Math.round(OPT.sens * 100); $("oInv").checked = OPT.invY; $("oFont").value = OPT.font; $("oFov").value = OPT.fov; $("oStyle").value = OPT.style; $("oPx").value = OPT.pxs; $("oDith").checked = OPT.dither;
   $("oMini").checked = OPT.mini; $("oNums").checked = OPT.nums; $("oAuto").checked = OPT.auto; $("oTouch").value = OPT.touch;
   $("oSens").oninput = e => { OPT.sens = e.target.value / 100; saveOpts(); };
   $("oInv").onchange = e => { OPT.invY = e.target.checked; saveOpts(); };
+  $("oStyle").onchange = e => { OPT.style = e.target.value; boost = 0; fit(); saveOpts(); };
+  $("oPx").oninput = e => { OPT.pxs = +e.target.value; fit(); saveOpts(); };
+  $("oDith").onchange = e => { OPT.dither = e.target.checked; saveOpts(); };
   $("oFont").oninput = e => { OPT.font = +e.target.value; FONT = OPT.font; fit(); saveOpts(); };
   $("oFov").oninput = e => { OPT.fov = +e.target.value; setFov(OPT.fov); saveOpts(); };
   $("oMini").onchange = e => { OPT.mini = e.target.checked; miniOn = OPT.mini; saveOpts(); };
@@ -1967,7 +2288,7 @@ function buildTouch() {
   const w = document.createElement("div"); w.id = "touch";
   w.innerHTML = '<div id="lookpad"></div><div id="joy"><div id="knob"></div></div>' +
     '<div class="tb" id="tAtk">⚔</div><div class="tb" id="tJump">⤒</div><div class="tb" id="tDodge">⤨</div><div class="tb" id="tUse">E</div>' +
-    '<div class="tb" id="tBlk">⛨</div><div class="tb" id="tWpn">⇄</div><div class="tb" id="tEat">♣</div><div class="tb" id="tMenu">☰</div>';
+    '<div class="tb" id="tBlk">⛨</div><div class="tb" id="tWpn">⇄</div><div class="tb" id="tEat">♣</div><div class="tb" id="tCmd">⚑</div><div class="tb" id="tMenu">☰</div>';
   screen.appendChild(w);
   const joy = $("joy"), knob = $("knob"), look = $("lookpad"); let jid = null, jcx = 0, jcy = 0, lid = null, lx = 0, ly = 0;
   const moveJoy = e => {
@@ -1993,42 +2314,12 @@ function buildTouch() {
   };
   hold("tAtk", attackDown, attackUp);
   hold("tJump", () => { keys[" "] = true; }, () => { keys[" "] = false; });
-  hold("tDodge", doDodge); hold("tUse", interact); hold("tEat", eatMush);
+  hold("tDodge", doDodge); hold("tUse", interact); hold("tEat", eatMush); hold("tCmd", cyclePawnCmd);
   hold("tBlk", () => { TOUCH.block = true; }, () => { TOUCH.block = false; });
-  hold("tWpn", () => { if (P.bow) { P.wpn = P.wpn === 1 ? 2 : 1; drawInv(); } });
+  hold("tWpn", () => { const o = [1]; if (P.bow) o.push(2); if (P.staff) o.push(3); P.wpn = o[(o.indexOf(P.wpn) + 1) % o.length]; drawInv(); });
   $("tMenu").addEventListener("pointerdown", e => { showMenu(); e.preventDefault(); e.stopPropagation(); });
 }
 
-function goto(level, x, y, a) {
-  setLevel(level); px = x; py = y; ang = a; pitch = 0; pz = 0; vz = 0; P.tcool = 0.9; FXL.length = 0; fadeFlash();
-  if (level.type === "cave") say("Se siente el aire frío. Algo se mueve en la oscuridad…", 3200);
-  if (OPT.auto) saveGame();
-}
-function smithTalk() {
-  const keep = (QS.cry && QS.cry.state === "active") ? QUESTS[0].need : 0, sell = INV.crystal - keep;
-  if (sell > 0) { const g = sell * 6; INV.coin += g; INV.crystal = keep; drawInv(); say("Herrero: ¡Buenos cristales! Te doy " + g + " monedas.", 3500); return; }
-  const av = OFFERS.filter(o => o.ok());
-  if (!av.length) { say("Herrero: ya tienes todo lo que vendo. ¡Ve por ese rey zombi!", 3500); return; }
-  if (offerT > 0 && offerI >= 0 && OFFERS[offerI].ok()) {
-    const o = OFFERS[offerI];
-    if (INV.coin >= o.cost) { INV.coin -= o.cost; applyOffer(o); offerI = -1; offerT = 0; drawInv(); say("Herrero: " + o.name + " lista. ¡Suerte allá abajo!", 3500); return; }
-    say("Herrero: te faltan " + (o.cost - INV.coin) + " monedas para la " + o.name + ".", 3000);
-  }
-  let k = offerI; do { k = (k + 1) % OFFERS.length; } while (!OFFERS[k].ok());
-  offerI = k; offerT = 9;
-  say("Herrero: " + OFFERS[k].name + " por " + OFFERS[k].cost + " monedas. Háblame otra vez para comprar.", 4200);
-}
-function interact() {
-  if (menuOpen || P.dead) return;
-  const t = nearInteract(); if (!t) return;
-  if (t.type === "chest") {
-    if (LV.boss && !(LV.boss.dead > 0)) { say("Un poder oscuro mantiene sellado el cofre…", 2800); return; }
-    t.open = true; P.hp = P.max; if (P.sword < 2) P.sword = 2; P.wpn = 1; INV.coin += 12; INV.arrow += 10; drawHearts(); drawInv();
-    say("¡Tesoro! Espada de hierro, 12 monedas, flechas y toda tu vida.", 4800);
-  } else if (t.smith) { smithTalk(); t.face = 1; }
-  else if (t.qid >= 0 && questTalk(t)) { t.face = 1; }
-  else { const ln = LINES[(t.line++) % LINES.length]; say(t.name + ": " + ln(), 4800); t.face = 1; }
-}
 function hurt(n) {
   if (P.dead || n <= 0 || P.inv > 0) return;
   P.hp = Math.max(0, P.hp - n); P.hurtT = 0.35; P.regen = 0; P.inv = 0.45; P.charging = false; P.chargeT = 0; drawHearts();
@@ -2054,7 +2345,8 @@ function die() { P.dead = true; P.charging = false; document.exitPointerLock && 
 function respawn() {
   P.dead = false; P.hp = P.max; P.sta = P.staMax; P.inv = 1.2; drawHearts();
   for (const a of WORLD.caveLevel.act) if (a.mob) a.cd = 1;
-  setLevel(WORLD); px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; pitch = 0; FXL.length = 0; fadeFlash();
+  const fol = detachFollowers();
+  setLevel(WORLD); px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; pitch = 0; FXL.length = 0; fadeFlash(); attachFollowers(fol, px, py);
 }
 function inputVec() {
   let fw = (keys["w"] || keys["arrowup"] ? 1 : 0) - (keys["s"] || keys["arrowdown"] ? 1 : 0), st = (keys["d"] ? 1 : 0) - (keys["a"] ? 1 : 0);
@@ -2063,7 +2355,7 @@ function inputVec() {
   return [fw, st];
 }
 function doDodge() {
-  if (P.dead || menuOpen || P.dodgeT > 0 || P.cdDodge > 0) return;
+  if (P.dead || menuOpen || P.boat || P.dodgeT > 0 || P.cdDodge > 0) return;
   if (!spend(25)) return;
   const [fw, st] = inputVec(), dx = Math.cos(ang), dy = Math.sin(ang);
   let vx = dx * fw - dy * st, vy = dy * fw + dx * st; const m = Math.hypot(vx, vy);
@@ -2080,6 +2372,7 @@ function attackUp() {
   if (!P.charging) return;
   P.charging = false; const t = P.chargeT; P.chargeT = 0;
   if (P.dead || menuOpen || P.blocking) return;
+  if (P.wpn === 3 && P.staff) { fireStaff(); return; }
   if (P.wpn === 2 && P.bow) { shoot(t); return; }
   if (P.swing >= 0) return;
   if (t >= 0.5 && spend(30)) P.heavy = true;
@@ -2096,22 +2389,6 @@ function shoot(t) {
   const a = add(LV, "arrow", px + dx * 0.4, py + dy * 0.4, { w: 0.5, h: 0.12, z: EYE - 0.18, sh: 0, vx: dx * sp, vy: dy * sp, vz: Math.tan(pitch) * sp, life: 2.5, from: "player", dmg: q });
   LV.prj.push(a);
 }
-function damageMob(a, dmg, kx, ky) {
-  if (a.dead > 0) return;
-  a.hp -= dmg; a.flash = 0.22;
-  spawnNum(a.x, a.y, (a.fly ? a.z : 0) + a.h + 0.2, "-" + dmg + (dmg >= 4 ? "!" : ""), dmg >= 4 ? [255,214,80] : [255,255,255]);
-  if (kx !== undefined && !a.fly) {
-    const f = a.type === "boss" ? 0.25 : 1, nx = a.x + kx * f, ny = a.y + ky * f;
-    if (!blockedFor(nx, a.y, a, 0.22)) a.x = nx; if (!blockedFor(a.x, ny, a, 0.22)) a.y = ny;
-  }
-  if (a.type === "boss") a.aggro = true;
-  if (a.hp <= 0) {
-    a.dead = 0.001; P.kills++; dropLoot(a);
-    if (a.mid !== undefined) LV.deadM.push(a.mid);
-    onKillQuest(a);
-    if (a.type === "boss") say("¡El rey zombi cayó! El cofre ya no está sellado.", 4200);
-  }
-}
 function swordHit(heavy) {
   const cs = Math.cos(ang), sn = Math.sin(ang), dmg = SWORDS[P.sword].dmg * (heavy ? 2 : 1) + (heavy ? 1 : 0), rg = heavy ? 2.5 : 2.0, cone = heavy ? 0.55 : 0.78, kb = heavy ? 1.2 : 0.6;
   for (const a of LV.act) {
@@ -2127,61 +2404,9 @@ function pickups() {
     pk.splice(i, 1); removeSprite(s);
     if (s.pid !== undefined && s.pid < LV.pk0) LV.taken.push(s.pid);
     let t = "+1", c = [255,214,80];
-    if (s.pick === "coin") INV.coin++; else if (s.pick === "crystal") { INV.crystal++; c = [190,160,255]; } else if (s.pick === "mush") { INV.mush++; c = [255,140,120]; } else if (s.pick === "arrow") { INV.arrow += 3; t = "+3"; c = [230,220,190]; }
+    if (s.pick === "coin") INV.coin++; else if (s.pick === "crystal") { INV.crystal++; c = [190,160,255]; } else if (s.pick === "mush") { INV.mush++; c = [255,140,120]; } else if (s.pick === "arrow") { INV.arrow += 3; t = "+3"; c = [230,220,190]; } else if (s.pick === "ore") { INV.ore++; c = [232,142,84]; } else if (s.pick === "gold") { INV.gold++; c = [255,224,112]; }
     spawnNum(s.x, s.y, 0.8, t, c); drawInv(); drawQuests();
   }
-}
-function resetPlayer() {
-  Object.assign(P, { hp: 10, max: 10, swing: -1, dead: false, sword: 0, shield: false, bow: false, wpn: 1, kills: 0, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5,
-    sta: 100, staMax: 100, staDelay: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0 });
-  INV.coin = 0; INV.crystal = 0; INV.mush = 0; INV.arrow = 0; offerI = -1; offerT = 0;
-  for (const k in QS) delete QS[k]; FXL.length = 0;
-}
-function step(dt) {
-  if (autoDay) dayT = (dayT + dt / DAY_LEN) % 1;
-  weatherUpdate(dt);
-  P.tcool = Math.max(0, P.tcool - dt); P.hurtT = Math.max(0, P.hurtT - dt); P.shotCd = Math.max(0, P.shotCd - dt); P.inv = Math.max(0, P.inv - dt);
-  P.shotAnim = Math.max(0, P.shotAnim - dt); P.blockFlash = Math.max(0, P.blockFlash - dt); P.staFlash = Math.max(0, P.staFlash - dt); P.cdDodge = Math.max(0, P.cdDodge - dt); offerT = Math.max(0, offerT - dt);
-  if (P.dead) { render(dt); return; }
-  P.blocking = !!(P.shield && (keys["k"] || mouseR || TOUCH.block) && P.sta > 0 && P.dodgeT <= 0);
-  const [fw, st] = inputVec();
-  const sprint = !!((keys["shift"] || TOUCH.run) && P.sta > 6 && (fw || st) && !P.blocking && !P.charging && P.dodgeT <= 0);
-  if (sprint) { P.sta -= 16 * dt; P.staDelay = 0.5; }
-  P.staDelay -= dt; if (P.staDelay <= 0 && !sprint) P.sta = Math.min(P.staMax, P.sta + (P.blocking ? 8 : 30) * dt);
-  P.sta = Math.max(0, P.sta);
-  if (P.charging) P.chargeT += dt;
-  const sp = 3.8 * (sprint ? 1.75 : 1) * (P.blocking ? 0.5 : 1) * (P.charging ? 0.7 : 1) * dt;
-  if (keys["arrowleft"]) ang -= 2.2 * dt; if (keys["arrowright"]) ang += 2.2 * dt;
-  if (keys["pageup"]) pitch = clamp(pitch + 1.5 * dt, -1.35, 1.35); if (keys["pagedown"]) pitch = clamp(pitch - 1.5 * dt, -1.35, 1.35);
-  if (keys["home"]) pitch = 0;
-  if (keys[" "] && pz <= 0.001) vz = 3.6;
-  vz -= 11 * dt; pz = Math.max(0, pz + vz * dt); if (pz === 0 && vz < 0) vz = 0;
-  const dx = Math.cos(ang), dy = Math.sin(ang);
-  let nx, ny, moving = !!(fw || st);
-  if (P.dodgeT > 0) { P.dodgeT -= dt; nx = px + P.ddx * 13 * dt; ny = py + P.ddy * 13 * dt; moving = true; }
-  else { nx = px + (dx * fw - dy * st) * sp; ny = py + (dy * fw + dx * st) * sp; }
-  P.moving = moving;
-  if (P.tcool <= 0 && moving) { const tr = triggerAt(nx, ny); if (tr) { doTrigger(tr); render(dt); return; } }
-  if (!blockedFor(nx, py, null, 0.2)) px = nx;
-  if (!blockedFor(px, ny, null, 0.2)) py = ny;
-  if (P.swing >= 0) {
-    P.swing += dt; const T0 = P.heavy ? 0.55 : SW_T, HT = P.heavy ? 0.22 : 0.13;
-    if (!P.hitDone && P.swing > HT) { P.hitDone = true; swordHit(P.heavy); }
-    if (P.swing >= T0) { P.swing = -1; P.heavy = false; }
-  }
-  updateActors(dt); updateProjectiles(dt); updateWolves(dt); pickups(); updateMarkers(); updateFX(dt);
-  if (P.hp < P.max && P.hurtT <= 0) { P.regen += dt; if (P.regen > 18) { P.regen = 0; P.hp++; drawHearts(); } }
-  if (msgTimer > 0) { msgTimer -= dt; if (msgTimer <= 0) $("msg").style.opacity = 0; }
-  P.saveT = (P.saveT || 0) + dt; if (OPT.auto && P.saveT > 20) saveGame();
-  const bb = LV.boss, bel = $("boss");
-  if (bb && bb.aggro && !(bb.dead > 0)) { bel.style.display = "block"; $("bossf").style.width = (100 * bb.hp / bb.maxhp) + "%"; } else bel.style.display = "none";
-  const it = nearInteract();
-  if (it) { promptEl.style.display = "block"; promptEl.textContent = "E"; } else promptEl.style.display = "none";
-  const sbar = $("staf"), pct = Math.round(100 * P.sta / P.staMax); if (sbar._p !== pct) { sbar._p = pct; sbar.style.width = pct + "%"; }
-  $("sta").classList.toggle("flash", P.staFlash > 0);
-  const cb = $("charge"), cmax = P.wpn === 2 ? 0.8 : 0.5;
-  if (P.charging && P.chargeT > 0.15) { cb.style.display = "block"; $("chargef").style.width = Math.min(100, P.chargeT / cmax * 100) + "%"; $("chargef").style.background = P.chargeT >= cmax ? "#ffd75e" : "#9ac8ff"; } else cb.style.display = "none";
-  render(dt);
 }
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -2195,6 +2420,606 @@ function loop(now) {
     frames = 0; ftime = 0;
   }
   requestAnimationFrame(loop);
+}
+
+// ============================================================
+//  EXPLORACIÓN: barco, cofres, mago, bastón, guardado v2
+// ============================================================
+let mageT = 0;
+function boatBlocked(x, y) {
+  if (LV.type !== "over") return true;
+  const r = 0.4;
+  return !(tileAt(x - r, y - r) === "~" && tileAt(x + r, y - r) === "~" && tileAt(x - r, y + r) === "~" && tileAt(x + r, y + r) === "~");
+}
+function blockedFor(x, y, self, r0) {
+  if (P.boat && self === null) return boatBlocked(x, y);
+  const r = r0 || 0.2;
+  if (solidTile(x - r, y - r) || solidTile(x + r, y - r) || solidTile(x - r, y + r) || solidTile(x + r, y + r)) return true;
+  if (self && self.fly) return false;
+  for (const s of LV.obst) { const dx = x - s.x, dy = y - s.y, rr = s.r + r * 0.8; if (dx * dx + dy * dy < rr * rr) return true; }
+  for (const a of LV.act) {
+    if (a === self || a.hidden || a.dead > 0 || a.fly || (a.pawn && a.following && (self === null || (self && self.pawn)))) continue;
+    const dx = x - a.x, dy = y - a.y, rr = a.r + r * 0.8; if (dx * dx + dy * dy < rr * rr) return true;
+  }
+  return false;
+}
+function boardBoat() {
+  const b = LV.boat; if (!b) return;
+  P.boat = b; b.hidden = true; px = b.x; py = b.y; P.charging = false; P.chargeT = 0;
+  say("¡A navegar! Pulsa E cerca de la orilla para bajar.", 3500);
+}
+function leaveBoat() {
+  const b = P.boat; P.boat = null;
+  let best = null, bd = 1e9;
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+    const cxp = Math.floor(px) + dx + 0.5, cyp = Math.floor(py) + dy + 0.5;
+    if (tileAt(cxp, cyp) !== "." || blockedFor(cxp, cyp, null, 0.2)) continue;
+    const d = Math.hypot(cxp - px, cyp - py); if (d < bd && d < 3.4) { bd = d; best = [cxp, cyp]; }
+  }
+  if (!best) { P.boat = b; say("Acércate más a la orilla.", 1800); return; }
+  b.x = px; b.y = py; b.hidden = false; px = best[0]; py = best[1]; say("Has desembarcado.", 1500);
+}
+function landNear() { for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (tileAt(px + dx, py + dy) === ".") return true; return false; }
+
+function nearInteract() {
+  if (P.boat) return null;
+  let best = null, bd = 9; const cs = Math.cos(ang), sn = Math.sin(ang);
+  for (const a of LV.act) {
+    if ((a.type !== "villager" && a.type !== "pawn") || a.hidden) continue;
+    const dx = a.x - px, dy = a.y - py, d = Math.hypot(dx, dy);
+    if (d < 2.0 && (dx * cs + dy * sn) / (d || 1) > 0.55 && d < bd) { bd = d; best = a; }
+  }
+  for (const ch of LV.chests) {
+    if (ch.open) continue;
+    const dx = ch.x - px, dy = ch.y - py, d = Math.hypot(dx, dy);
+    if (d < 1.8 && (dx * cs + dy * sn) / (d || 1) > 0.5 && d < bd) { bd = d; best = ch; }
+  }
+  if (LV.boat && !LV.boat.hidden) {
+    const b = LV.boat, dx = b.x - px, dy = b.y - py, d = Math.hypot(dx, dy);
+    if (d < 2.8 && (dx * cs + dy * sn) / (d || 1) > 0.35 && d < bd) { bd = d; best = b; }
+  }
+  return best;
+}
+function openChest(t) {
+  if (t.guard && !(t.guard.dead > 0)) { say("Un poder oscuro mantiene sellado el cofre…", 2800); return; }
+  t.open = true;
+  switch (t.loot) {
+    case "ruins": INV.coin += 40; INV.tome = 1; P.staMax = Math.max(P.staMax, 120); P.sta = P.staMax; say("¡Ruinas antiguas! 40 monedas, un grimorio y más aguante máximo.", 5200); break;
+    case "island": INV.coin += 60; INV.arrow += 6; if (P.max < 14) { P.max++; P.hp = P.max; } say("¡Tesoro enterrado! 60 monedas, flechas y un corazón extra.", 5200); break;
+    case "mine": INV.coin += 50; INV.ore += 3; if (P.sword < 2) P.sword = 2; P.hp = P.max; say("¡El tesoro de la mina! Monedas, mineral y espada de hierro.", 5200); break;
+    case "minor": INV.coin += 18; INV.arrow += 5; INV.mush += 1; say("Un cofre olvidado: monedas, flechas y un hongo.", 3500); break;
+    default: P.hp = P.max; if (P.sword < 2) P.sword = 2; P.wpn = 1; INV.coin += 12; INV.arrow += 10; say("¡Tesoro! Espada de hierro, 12 monedas, flechas y toda tu vida.", 4800);
+  }
+  drawHearts(); drawInv();
+}
+function mageTalk(v) {
+  const q = QUESTS[v.qid], st = qState(q);
+  if (st === "new") { questTalk(v); return; }
+  if (st === "active") {
+    if (INV.tome > 0) { questTalk(v); return; }
+    if (!P.staff && mageT > 0) {
+      if (INV.coin >= 45) { INV.coin -= 45; P.staff = true; P.wpn = 3; mageT = 0; drawInv(); say("Eldrin: El bastón es tuyo. Cuídalo.", 3500); }
+      else say("Eldrin: te faltan " + (45 - INV.coin) + " monedas.", 3000);
+      return;
+    }
+    if (!P.staff) { mageT = 9; say("Eldrin: ¿Aún sin grimorio? Te vendo el bastón por 45 monedas. Háblame otra vez para comprar.", 4800); return; }
+    say("Eldrin: " + q.hint, 3500); return;
+  }
+  say("Eldrin: Que la llama te guíe, viajero.", 3000);
+}
+function smithTalk() {
+  const keepC = (QS.cry && QS.cry.state === "active") ? QUESTS[0].need : 0, keepO = (QS.ore && QS.ore.state === "active") ? QUESTS[5].need : 0;
+  const sc = Math.max(0, INV.crystal - keepC), so = Math.max(0, INV.ore - keepO), sg = INV.gold;
+  if (sc + so + sg > 0) { const g = sc * 6 + so * 8 + sg * 20; INV.coin += g; INV.crystal -= sc; INV.ore -= so; INV.gold = 0; drawInv(); say("Herrero: ¡Buen material! Te doy " + g + " monedas.", 3500); return; }
+  const av = OFFERS.filter(o => o.ok());
+  if (!av.length) { say("Herrero: ya tienes todo lo que vendo. ¡Ve por ese rey zombi!", 3500); return; }
+  if (offerT > 0 && offerI >= 0 && OFFERS[offerI].ok()) {
+    const o = OFFERS[offerI];
+    if (INV.coin >= o.cost) { INV.coin -= o.cost; applyOffer(o); offerI = -1; offerT = 0; drawInv(); say("Herrero: " + o.name + " lista. ¡Suerte allá abajo!", 3500); return; }
+    say("Herrero: te faltan " + (o.cost - INV.coin) + " monedas para la " + o.name + ".", 3000);
+  }
+  let k = offerI; do { k = (k + 1) % OFFERS.length; } while (!OFFERS[k].ok());
+  offerI = k; offerT = 9;
+  say("Herrero: " + OFFERS[k].name + " por " + OFFERS[k].cost + " monedas. Háblame otra vez para comprar.", 4200);
+}
+function interact() {
+  if (menuOpen || P.dead) return;
+  if (P.boat) { leaveBoat(); return; }
+  const t = nearInteract(); if (!t) return;
+  if (t.type === "boat") { boardBoat(); return; }
+  if (t.type === "chest") { openChest(t); return; }
+  if (t.type === "pawn") { pawnInteract(t); return; }
+  if (t.smith) { smithTalk(); t.face = 1; }
+  else if (t.mage) { mageTalk(t); t.face = 1; }
+  else if (t.qid >= 0 && questTalk(t)) { t.face = 1; }
+  else { const ln = LINES[(t.line++) % LINES.length]; say(t.name + ": " + ln(), 4800); t.face = 1; }
+}
+function doTrigger(tr) {
+  if (LV.type === "over") {
+    if (tr.t === "D") { const h = LV.houses[hid[tr.my][tr.mx]]; if (h) { const lv = h.level; lv.ret.lvl = LV; goto(lv, lv.spawn.x, lv.spawn.y, lv.spawn.ang); } }
+    else if (tr.t === "C") { const lv = LV.caveLevel; lv.ret.lvl = LV; goto(lv, lv.spawn.x, lv.spawn.y, lv.spawn.ang); }
+    else if (tr.t === "N") { const lv = LV.mines[0]; goto(lv, lv.up.outX, lv.up.outY, lv.up.ang); }
+    else if (tr.t === "G") { const lv = LV.towerLevel; goto(lv, lv.spawn.x, lv.spawn.y, lv.spawn.ang); }
+  } else if (tr.t === "X") { const r = LV.ret; goto(r.lvl, r.x, r.y, r.ang); }
+  else if (tr.t === "U" && LV.mine) {
+    if (LV.mine === 1) { const r = LV.ret; goto(r.lvl, r.x, r.y, r.ang); }
+    else { const prev = WORLD.mines[LV.mine - 2]; goto(prev, prev.dn.outX, prev.dn.outY, prev.dn.ang); }
+  } else if (tr.t === "S" && LV.mine) { const next = WORLD.mines[LV.mine]; goto(next, next.up.outX, next.up.outY, next.up.ang); }
+}
+function goto(level, x, y, a) {
+  const fol = detachFollowers();
+  setLevel(level); px = x; py = y; ang = a; pitch = 0; pz = 0; vz = 0; P.tcool = 0.9; FXL.length = 0; fadeFlash(); attachFollowers(fol, x, y);
+  if (level.mine === 1 && !level.visited) say("Huele a polvo y madera vieja. Los rieles se pierden en la oscuridad…", 3600);
+  else if (level.mine > 1) note("Mina · nivel " + level.mine);
+  else if (level.type === "cave" && !level.mine) say("Se siente el aire frío. Algo se mueve en la oscuridad…", 3200);
+  level.visited = true;
+  if (OPT.auto) saveGame();
+}
+function onKillQuest(a) {
+  for (const q of QUESTS) {
+    const s = QS[q.id]; if (!s || s.state !== "active") continue;
+    if (q.type === "kill" && a.type !== "wolf" && a.type !== "golem" && LV.type === "cave") s.prog++;
+    else if (q.type === "wolf" && a.type === "wolf") s.prog++;
+    else if (q.type === "boss" && a.type === "boss") s.prog++;
+    else if (q.type === "golem" && a.type === "golem") s.prog++;
+  }
+  drawQuests();
+}
+function giveReward(q) {
+  const r = q.rew, parts = [];
+  if (r.coin) { INV.coin += r.coin; parts.push(r.coin + " monedas"); }
+  if (r.mush) { INV.mush += r.mush; parts.push(r.mush + " hongos"); }
+  if (r.arrow) { INV.arrow += r.arrow; parts.push(r.arrow + " flechas"); }
+  if (r.staff) { P.staff = true; P.wpn = 3; parts.push("el bastón de fuego"); }
+  if (r.heart && P.max < 14) { P.max++; P.hp = P.max; parts.push("un corazón extra"); drawHearts(); }
+  drawInv(); return parts.join(", ");
+}
+function damageMob(a, dmg, kx, ky) {
+  if (a.dead > 0) return;
+  a.hp -= dmg; a.flash = 0.22; P.lastHit = a; P.lastHitT = T;
+  spawnNum(a.x, a.y, (a.fly ? a.z : 0) + a.h + 0.2, "-" + dmg + (dmg >= 4 ? "!" : ""), dmg >= 4 ? [255,214,80] : [255,255,255]);
+  if (kx !== undefined && !a.fly) {
+    const f = (a.type === "boss" || a.type === "golem") ? 0.25 : 1, nx = a.x + kx * f, ny = a.y + ky * f;
+    if (!blockedFor(nx, a.y, a, 0.22)) a.x = nx; if (!blockedFor(a.x, ny, a, 0.22)) a.y = ny;
+  }
+  if (a.type === "boss" || a.type === "golem") a.aggro = true;
+  if (a.hp <= 0) {
+    a.dead = 0.001; P.kills++; dropLoot(a);
+    if (a.mid !== undefined) LV.deadM.push(a.mid);
+    onKillQuest(a);
+    if (a.type === "boss") say("¡El rey zombi cayó! El cofre ya no está sellado.", 4200);
+    if (a.type === "golem") say("¡El golem se desmorona! El cofre del fondo ya no está sellado.", 4200);
+  }
+}
+function fireStaff() {
+  if (P.shotCd > 0 || !spend(18)) return;
+  P.shotCd = 0.7; P.shotAnim = 0.25;
+  const dx = Math.cos(ang), dy = Math.sin(ang), sp = 13;
+  const a = add(LV, "fireball", px + dx * 0.5, py + dy * 0.5, { w: 0.6, h: 0.6, z: EYE - 0.35, sh: 0, vx: dx * sp, vy: dy * sp, vz: Math.tan(pitch) * sp, grav: 0, life: 2.2, from: "player", dmg: 3 });
+  LV.prj.push(a);
+}
+function updateProjectiles(dt) {
+  for (let i = LV.prj.length - 1; i >= 0; i--) {
+    const a = LV.prj[i];
+    a.x += a.vx * dt; a.y += a.vy * dt; a.vz -= (a.grav === undefined ? 1.6 : a.grav) * dt; a.z += a.vz * dt; a.life -= dt;
+    let gone = a.life <= 0 || a.z < 0 || solidTile(a.x, a.y) || a.z > (LV.type === "over" ? 30 : LV.ceil);
+    if (!gone && a.from === "player") {
+      const rad = a.type === "fireball" ? 0.35 : 0.18;
+      for (const m of LV.act) {
+        if (!m.mob || m.dead > 0 || m.hidden) continue;
+        const base = m.fly ? m.z : 0;
+        if (Math.hypot(m.x - a.x, m.y - a.y) < m.r + rad && a.z >= base - 0.2 && a.z <= base + m.h + 0.2) {
+          damageMob(m, a.dmg || 2, a.vx * 0.03, a.vy * 0.03); gone = true;
+          if (a.type === "fireball") for (const o of LV.act.slice()) if (o !== m && o.mob && !(o.dead > 0) && !o.hidden && Math.hypot(o.x - a.x, o.y - a.y) < 1.4) damageMob(o, 1);
+          break;
+        }
+      }
+    } else if (!gone && a.from === "enemy" && !P.dead) {
+      if (Math.hypot(px - a.x, py - a.y) < 0.4 && a.z > pz - 0.1 && a.z < EYE + 0.2) { hurtP(1, a.x - a.vx * 0.2, a.y - a.vy * 0.2, "arrow"); gone = true; }
+    }
+    if (gone) { LV.prj.splice(i, 1); removeSprite(a); }
+  }
+}
+function drawInv() {
+  const tc = ["#c8965a", "#b8bcc8", "#f4f6ff"][P.sword];
+  let s = '<span class="sl' + (P.wpn === 1 ? " on" : "") + '" style="color:' + tc + '">1 ⚔</span>';
+  if (P.bow) s += '<span class="sl' + (P.wpn === 2 ? " on" : "") + '">2 ➶</span>';
+  if (P.staff) s += '<span class="sl' + (P.wpn === 3 ? " on" : "") + '" style="color:#ff9a3c">3 ✦</span>';
+  if (P.shield) s += '<span class="sl">K ⛨</span>';
+  s += '<span class="it" style="color:#ffd75e">● ' + INV.coin + '</span>';
+  if (INV.crystal) s += '<span class="it" style="color:#b9a2ff">◆ ' + INV.crystal + '</span>';
+  if (INV.ore) s += '<span class="it" style="color:#e8905a">▲ ' + INV.ore + '</span>';
+  if (INV.gold) s += '<span class="it" style="color:#ffe070">◉ ' + INV.gold + '</span>';
+  if (INV.tome) s += '<span class="it" style="color:#d8b8ff">▤ ' + INV.tome + '</span>';
+  if (INV.mush) s += '<span class="it" style="color:#ff8c7a">♣ ' + INV.mush + '</span>';
+  if (P.bow) s += '<span class="it" style="color:#e8d8b8">➳ ' + INV.arrow + '</span>';
+  $("inv").innerHTML = s;
+}
+function resetPlayer() {
+  Object.assign(P, { hp: 10, max: 10, swing: -1, dead: false, sword: 0, shield: false, bow: false, staff: false, boat: null, wpn: 1, kills: 0, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5,
+    sta: 100, staMax: 100, staDelay: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0, cactusCd: 0 });
+  INV.coin = 0; INV.crystal = 0; INV.mush = 0; INV.arrow = 0; INV.ore = 0; INV.gold = 0; INV.tome = 0; offerI = -1; offerT = 0; mageT = 0; pawnCmdMode = "follow"; $("party").innerHTML = "";
+  for (const k in QS) delete QS[k]; FXL.length = 0;
+}
+function step(dt) {
+  if (autoDay) dayT = (dayT + dt / DAY_LEN) % 1;
+  weatherUpdate(dt);
+  P.tcool = Math.max(0, P.tcool - dt); P.hurtT = Math.max(0, P.hurtT - dt); P.shotCd = Math.max(0, P.shotCd - dt); P.inv = Math.max(0, P.inv - dt);
+  P.shotAnim = Math.max(0, P.shotAnim - dt); P.blockFlash = Math.max(0, P.blockFlash - dt); P.staFlash = Math.max(0, P.staFlash - dt); P.cdDodge = Math.max(0, P.cdDodge - dt);
+  P.cactusCd = Math.max(0, P.cactusCd - dt); offerT = Math.max(0, offerT - dt); mageT = Math.max(0, mageT - dt);
+  if (P.dead) { render(dt); return; }
+  const onBoat = !!P.boat;
+  P.blocking = !!(P.shield && !onBoat && (keys["k"] || mouseR || TOUCH.block) && P.sta > 0 && P.dodgeT <= 0);
+  let [fw, st] = inputVec(); if (onBoat) st *= 0.3;
+  const sprint = !!(!onBoat && (keys["shift"] || TOUCH.run) && P.sta > 6 && (fw || st) && !P.blocking && !P.charging && P.dodgeT <= 0);
+  if (sprint) { P.sta -= 16 * dt; P.staDelay = 0.5; }
+  P.staDelay -= dt; if (P.staDelay <= 0 && !sprint) P.sta = Math.min(P.staMax, P.sta + (P.blocking ? 8 : 30) * dt);
+  P.sta = Math.max(0, P.sta);
+  if (P.charging) P.chargeT += dt;
+  const bog = !onBoat && LV.type === "over" && ftAt(px, py) === "bog";
+  const sp = (onBoat ? 4.8 : 3.8 * (sprint ? 1.75 : 1) * (P.blocking ? 0.5 : 1) * (P.charging ? 0.7 : 1) * (bog ? 0.6 : 1)) * dt;
+  if (keys["arrowleft"]) ang -= 2.2 * dt; if (keys["arrowright"]) ang += 2.2 * dt;
+  if (keys["pageup"]) pitch = clamp(pitch + 1.5 * dt, -1.35, 1.35); if (keys["pagedown"]) pitch = clamp(pitch - 1.5 * dt, -1.35, 1.35);
+  if (keys["home"]) pitch = 0;
+  if (!onBoat && keys[" "] && pz <= 0.001) vz = 3.6;
+  vz -= 11 * dt; pz = Math.max(0, pz + vz * dt); if (pz === 0 && vz < 0) vz = 0;
+  const dx = Math.cos(ang), dy = Math.sin(ang);
+  let nx, ny, moving = !!(fw || st);
+  if (P.dodgeT > 0) { P.dodgeT -= dt; nx = px + P.ddx * 13 * dt; ny = py + P.ddy * 13 * dt; moving = true; }
+  else { nx = px + (dx * fw - dy * st) * sp; ny = py + (dy * fw + dx * st) * sp; }
+  P.moving = moving;
+  if (!onBoat && P.tcool <= 0 && moving) { const tr = triggerAt(nx, ny); if (tr) { doTrigger(tr); render(dt); return; } }
+  if (!blockedFor(nx, py, null, 0.2)) px = nx;
+  if (!blockedFor(px, ny, null, 0.2)) py = ny;
+  if (LV.type === "over" && !onBoat && P.cactusCd <= 0 && LV.cacti.length) {
+    for (const c of LV.cacti) if (Math.hypot(c.x - px, c.y - py) < c.r + 0.42) { hurt(1); P.cactusCd = 1; break; }
+  }
+  if (P.swing >= 0) {
+    P.swing += dt; const T0 = P.heavy ? 0.55 : SW_T, HT = P.heavy ? 0.22 : 0.13;
+    if (!P.hitDone && P.swing > HT) { P.hitDone = true; swordHit(P.heavy); }
+    if (P.swing >= T0) { P.swing = -1; P.heavy = false; }
+  }
+  updateActors(dt); updateProjectiles(dt); updateWolves(dt); pickups(); updateMarkers(); updateFX(dt);
+  if (P.hp < P.max && P.hurtT <= 0) { P.regen += dt; if (P.regen > 18) { P.regen = 0; P.hp++; drawHearts(); } }
+  if (msgTimer > 0) { msgTimer -= dt; if (msgTimer <= 0) $("msg").style.opacity = 0; }
+  P.saveT = (P.saveT || 0) + dt; if (OPT.auto && P.saveT > 20) saveGame();
+  const bb = LV.boss, bel = $("boss");
+  if (bb && bb.aggro && !(bb.dead > 0)) { bel.style.display = "block"; $("bossf").style.width = (100 * bb.hp / bb.maxhp) + "%"; } else bel.style.display = "none";
+  const it = nearInteract();
+  if (it || (onBoat && landNear())) { promptEl.style.display = "block"; promptEl.textContent = "E"; } else promptEl.style.display = "none";
+  const sbar = $("staf"), pct = Math.round(100 * P.sta / P.staMax); if (sbar._p !== pct) { sbar._p = pct; sbar.style.width = pct + "%"; }
+  $("sta").classList.toggle("flash", P.staFlash > 0);
+  const cb = $("charge"), cmax = P.wpn === 2 ? 0.8 : 0.5;
+  if (P.charging && P.chargeT > 0.15 && P.wpn !== 3) { cb.style.display = "block"; $("chargef").style.width = Math.min(100, P.chargeT / cmax * 100) + "%"; $("chargef").style.background = P.chargeT >= cmax ? "#ffd75e" : "#9ac8ff"; } else cb.style.display = "none";
+  render(dt);
+}
+
+// ---- guardado v2 ----
+function allLevels(w) { return [w, w.caveLevel].concat(w.mines, [w.towerLevel]); }
+function hasSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return !!s && s.v === 2; } catch (e) { return false; } }
+function saveGame(manual) {
+  if (P.dead || !WORLD) return false;
+  const w = WORLD, lv = LV;
+  const lt = lv === w ? { t: "over" } : lv === w.caveLevel ? { t: "cave" } : lv === w.towerLevel ? { t: "tower" } : w.mines.includes(lv) ? { t: "mine", i: w.mines.indexOf(lv) } : { t: "house", id: lv.pal.id };
+  const sv = { v: 2, seed: SEED, dayT, autoDay, weather: W.name, lvl: lt, x: px, y: py, a: ang, hp: P.hp, max: P.max, sta: P.sta, staMax: P.staMax, sword: P.sword, shield: P.shield, bow: P.bow, staff: P.staff, wpn: P.wpn,
+    inv: INV, qs: QS, kills: P.kills, snowG: W.snowG, pawns: (w.pawns || []).map(q => ({ f: q.following ? 1 : 0, hp: q.hp, d: q.down ? 1 : 0, m: q.mode })), boat: w.boat ? (P.boat ? { x: px, y: py } : { x: w.boat.x, y: w.boat.y }) : null, onBoat: !!P.boat,
+    st: allLevels(w).map(l => ({ taken: l.taken, deadM: l.deadM, ch: l.chests.map(c => !!c.open) })) };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); } catch (e) { return false; }
+  P.saveT = 0; if (manual) note("Partida guardada"); return true;
+}
+function loadGame() {
+  let sv; try { sv = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
+  if (!sv || sv.v !== 2) return false;
+  let w = null; try { w = genOverworld(sv.seed); } catch (e) { w = null; }
+  if (!w) return false;
+  WORLD = w; SEED = sv.seed; resetPlayer();
+  const lvls = allLevels(w);
+  (sv.st || []).forEach((s, i) => {
+    const l = lvls[i]; if (!l || !s) return;
+    applyTaken(l, s.taken); l.deadM = (s.deadM || []).slice();
+    for (const m of l.act.slice()) if (m.mid !== undefined && l.deadM.includes(m.mid)) { m.dead = 5; l.act.splice(l.act.indexOf(m), 1); const k = l.spr.indexOf(m); if (k >= 0) l.spr.splice(k, 1); }
+    (s.ch || []).forEach((o, j) => { if (o && l.chests[j]) l.chests[j].open = true; });
+  });
+  Object.assign(P, { hp: sv.hp, max: sv.max, sta: sv.sta, staMax: sv.staMax || 100, sword: sv.sword, shield: sv.shield, bow: sv.bow, staff: !!sv.staff, wpn: sv.wpn, kills: sv.kills || 0 });
+  Object.assign(INV, sv.inv); for (const k in QS) delete QS[k]; Object.assign(QS, sv.qs || {});
+  dayT = sv.dayT; autoDay = sv.autoDay; setWeather(sv.weather); Object.assign(W, WPRE[sv.weather] || WPRE.clear); W.snowG = sv.snowG || 0;
+  const t = sv.lvl, lvl = t.t === "over" ? w : t.t === "cave" ? w.caveLevel : t.t === "tower" ? w.towerLevel : t.t === "mine" ? w.mines[t.i] : w.houses[t.id].level;
+  setLevel(lvl);
+  if (sv.boat && w.boat) { w.boat.x = sv.boat.x; w.boat.y = sv.boat.y; }
+  px = sv.x; py = sv.y; ang = sv.a; pitch = 0;
+  if (sv.onBoat && lvl === w && w.boat) { P.boat = w.boat; w.boat.hidden = true; }
+  restorePawns(sv.pawns);
+  drawHearts(); drawInv(); drawQuests();
+  return true;
+}
+
+// ============================================================
+//  MODO PÍXEL + PEONES
+// ============================================================
+let PIXEL = false, loC = null, loX = null, loImg = null, lo32 = null;
+const TXT = [];
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const CHF = new Float32Array(65536).fill(0.5);
+CHF[32] = 0; for (const c of ".,:\"'-_~`") CHF[c.charCodeAt(0)] = 0.25;
+function fit() {
+  DPR = Math.min(2, (typeof devicePixelRatio !== "undefined" && devicePixelRatio) || 1);
+  PIXEL = OPT.style === "pixel";
+  const w = screen.clientWidth * DPR, h = screen.clientHeight * DPR;
+  const fontStr = () => LH + 'px "Cascadia Mono",Consolas,Menlo,monospace';
+  if (PIXEL) { LH = Math.max(2, Math.round((OPT.pxs + boost) * DPR)); cw = LH; }
+  else { LH = Math.max(6, Math.round((FONT + boost) * DPR)); ctx.font = fontStr(); cw = ctx.measureText("M").width; }
+  COLS = Math.max(60, Math.floor(w / cw)); ROWS = Math.max(30, Math.floor(h / LH));
+  cv.width = Math.ceil(COLS * cw); cv.height = ROWS * LH;
+  cv.style.width = (cv.width / DPR) + "px"; cv.style.height = (cv.height / DPR) + "px";
+  if (PIXEL) {
+    ctx.imageSmoothingEnabled = false;
+    loC = document.createElement("canvas"); loC.width = COLS; loC.height = ROWS; loX = loC.getContext("2d");
+    loImg = loX.createImageData(COLS, ROWS); lo32 = new Uint32Array(loImg.data.buffer);
+  } else { ctx.font = fontStr(); ctx.textBaseline = "top"; }
+  PK = (cv.width / 2) / TAN / LH;
+  const N = COLS * ROWS;
+  bgB = new Int32Array(N); fgB = new Int32Array(N); chB = new Uint16Array(N);
+  HD = new Float32Array(COLS * 4); HS0 = new Int16Array(COLS * 4); HS1 = new Int16Array(COLS * 4); HN = new Uint8Array(COLS);
+}
+function buildPixels(out) {
+  const N = COLS * ROWS, dith = OPT.dither, lv = 7, k = (lv - 1) / 255;
+  for (let i = 0; i < N; i++) {
+    const c = bgB[i], f = CHF[chB[i]];
+    let r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+    if (f > 0) { const q = fgB[i]; r += (((q >> 16) & 255) - r) * f; g += (((q >> 8) & 255) - g) * f; b += ((q & 255) - b) * f; }
+    if (dith) {
+      const x = i % COLS, y = (i / COLS) | 0, t = (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16 - 0.5;
+      r = Math.max(0, Math.min(lv - 1, Math.round(r * k + t))) / k; g = Math.max(0, Math.min(lv - 1, Math.round(g * k + t))) / k; b = Math.max(0, Math.min(lv - 1, Math.round(b * k + t))) / k;
+    }
+    out[i] = (255 << 24) | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
+  }
+}
+function presentPixel() {
+  buildPixels(lo32); loX.putImageData(loImg, 0, 0);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(loC, 0, 0, cv.width, cv.height);
+  if (TXT.length) {
+    ctx.font = "bold " + Math.round(14 * DPR) + 'px "Cascadia Mono",Consolas,Menlo,monospace'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3 * DPR; ctx.strokeStyle = "#000";
+    for (const t of TXT) { ctx.strokeText(t.t, t.x, t.y); ctx.fillStyle = t.c; ctx.fillText(t.t, t.x, t.y); }
+    ctx.textAlign = "left"; TXT.length = 0;
+  }
+}
+function present() { if (PIXEL) presentPixel(); else presentAscii(); }
+
+// ---- peones ----
+const PCL = {
+  guerrero: { hp: 14, name: "Guerrero", shirt: [150,156,172], pants: [86,88,100], hat: [170,174,188] },
+  arquero:  { hp: 9,  name: "Arquera",  shirt: [72,120,76],   pants: [90,70,50],   hat: [60,110,70] },
+  mago:     { hp: 8,  name: "Hechicero", shirt: [100,64,160], pants: [60,40,100],  hat: [100,64,160] },
+  clerigo:  { hp: 10, name: "Clérigo",  shirt: [236,236,240], pants: [200,190,150], hat: [230,200,90] },
+};
+const PNAMES = { guerrero: "Bruno", arquero: "Sira", mago: "Orlan", clerigo: "Nia" };
+const PMODES = ["follow", "attack", "wait"], PMODE_LABEL = { follow: "Seguir", attack: "Atacar", wait: "Esperar" };
+let pawnCmdMode = "follow", PAWNS = [], chatT = 0, partyT = 0;
+const PLT = { pl: true, x: 0, y: 0 };
+function mkPawn(Lv, cls, x, y, idx) {
+  const c = PCL[cls];
+  const p = add(Lv, "pawn", x, y, { actor: true, pawn: true, cls, name: PNAMES[cls], w: 0.5, h: 1.05, r: 0.24, skin: SKINS[idx % 4], shirt: c.shirt, pants: c.pants, hat: c.hat, hair: HAIRS[idx % 5],
+    hp: c.hp, maxhp: c.hp, following: false, down: false, downT: 0, cd: 1, healCd: 6, talkCd: 3, flash: 0, phase: 0, moving: false, mode: "follow", idx, lv: Lv, sh: 0.4, dead: 0, line: 0, stuck: 0, dismissT: 0 });
+  Lv.act.push(p); p.marker = add(Lv, "marker", x, y, { w: 0.22, h: 0.32, z: 1.2, sh: 0, kind: "p" });
+  return p;
+}
+function followers() { return (WORLD && WORLD.pawns) ? WORLD.pawns.filter(p => p.following) : []; }
+function detachFollowers() {
+  const fs = followers();
+  for (const p of fs) { const l = p.lv, i = l.act.indexOf(p); if (i >= 0) l.act.splice(i, 1); const k = l.spr.indexOf(p); if (k >= 0) l.spr.splice(k, 1); }
+  return fs;
+}
+function attachFollowers(fs, x, y) {
+  const offs = [[-0.7, 0.4], [0.7, 0.4], [0, -0.8], [0, 0.8], [-1.2, 0], [1.2, 0], [0, 0]];
+  fs.forEach((p, i) => {
+    p.lv = LV; LV.act.push(p); LV.spr.push(p); p.mode = pawnCmdMode; p.stuck = 0;
+    let ok = false;
+    for (let k = 0; k < offs.length && !ok; k++) { const o = offs[(k + i) % offs.length], nx = x + o[0], ny = y + o[1]; if (!solidTile(nx, ny)) { p.x = nx; p.y = ny; ok = true; } }
+    if (!ok) { p.x = x; p.y = y; }
+  });
+  drawParty();
+}
+function restorePawns(list) {
+  const w = WORLD; if (!w.pawns || !list) return;
+  const fs = [];
+  list.forEach((s, i) => { const p = w.pawns[i]; if (!p) return; p.hp = s.hp; p.down = !!s.d; p.dead = p.down ? 0.55 : 0; p.downT = 10; p.mode = s.m || "follow"; if (s.f) { p.following = true; p.marker.hidden = true; fs.push(p); } });
+  for (const p of fs) { const l = p.lv, i = l.act.indexOf(p); if (i >= 0) l.act.splice(i, 1); const k = l.spr.indexOf(p); if (k >= 0) l.spr.splice(k, 1); }
+  attachFollowers(fs, px, py);
+}
+function pawnSay(p, text) { const c = $("chat"); c.textContent = p.name + ": " + text; c.style.opacity = 1; chatT = 2.8; }
+function drawParty() {
+  const fs = followers(); let s = "";
+  for (const p of fs) s += '<div class="pw"><span>' + p.name + " · " + PCL[p.cls].name + (p.down ? " (caído)" : "") + '</span><div class="pb"><div style="width:' + Math.round(100 * p.hp / p.maxhp) + '%"></div></div></div>';
+  if (fs.length) s += '<div class="pc">Orden: ' + PMODE_LABEL[pawnCmdMode] + " (T)</div>";
+  $("party").innerHTML = s;
+}
+function partyTick(dt) {
+  if (chatT > 0) { chatT -= dt; if (chatT <= 0) $("chat").style.opacity = 0; }
+  partyT -= dt; if (partyT <= 0) { partyT = 0.5; if (followers().length) drawParty(); }
+}
+function cyclePawnCmd() {
+  pawnCmdMode = PMODES[(PMODES.indexOf(pawnCmdMode) + 1) % PMODES.length];
+  for (const p of followers()) p.mode = pawnCmdMode;
+  note("Orden a los peones: " + PMODE_LABEL[pawnCmdMode]); drawParty();
+}
+function pawnInteract(p) {
+  if (p.down) { p.down = false; p.dead = 0; p.hp = Math.ceil(p.maxhp * 0.5); pawnSay(p, "¡Gracias! Sigo contigo."); drawParty(); return; }
+  if (p.following) {
+    if (p.dismissT > 0) {
+      p.following = false; p.dismissT = 0;
+      const l = p.lv, i = l.act.indexOf(p); if (i >= 0) l.act.splice(i, 1); const k = l.spr.indexOf(p); if (k >= 0) l.spr.splice(k, 1);
+      p.lv = WORLD; WORLD.act.push(p); WORLD.spr.push(p); p.x = p.home.x; p.y = p.home.y;
+      say(p.name + " vuelve a la plaza del pueblo.", 2600); drawParty(); return;
+    }
+    p.dismissT = 3; say(p.name + ": ¿Quieres que me quede? Pulsa E otra vez para despedirme.", 2600); return;
+  }
+  if (followers().length >= 2) { say("Ya llevas dos peones. Despide a uno primero.", 2600); return; }
+  p.following = true; p.marker.hidden = true; p.mode = pawnCmdMode;
+  say(p.name + " (" + PCL[p.cls].name + ") se une a ti. Pulsa T para darles órdenes.", 3600); drawParty();
+}
+function hurtPawn(p, dmg) {
+  if (p.down) return;
+  p.hp -= dmg; p.flash = 0.2; spawnNum(p.x, p.y, 1.3, "-" + dmg, [255,120,120]);
+  if (p.hp <= 0) { p.hp = 0; p.down = true; p.downT = 25; p.dead = 0.55; pawnSay(p, "¡Estoy herido! ¡Ayúdame!"); }
+  drawParty();
+}
+function spotLine(t) {
+  return { wolf: "¡Un lobo!", zombie: "¡Un zombi!", skeleton: "¡Esqueleto! Cuidado con las flechas.", spider: "¡Una araña!", bat: "¡Murciélagos!", boss: "¡Es el rey zombi!", golem: "¡Un golem de roca!" }[t.type] || "¡Enemigo!";
+}
+function fireBolt(p, tg, tz) {
+  const dx = tg.x - p.x, dy = tg.y - p.y, d = Math.hypot(dx, dy) || 1, sp = 11, t = d / sp;
+  LV.prj.push(add(LV, "fireball", p.x, p.y, { w: 0.5, h: 0.5, z: 0.8, sh: 0, vx: dx / d * sp, vy: dy / d * sp, vz: (tz - 0.8) / t, grav: 0, life: 2, from: "player", dmg: 2 }));
+}
+function pawnTarget(p, scan) {
+  let best = null, bd = 1e9;
+  for (const m of LV.act) {
+    if (!m.mob || m.dead > 0 || m.hidden) continue;
+    const d = Math.hypot(m.x - p.x, m.y - p.y); if (d > scan) continue;
+    const sc = d - (m === P.lastHit && T - (P.lastHitT || 0) < 6 ? 3 : 0);
+    if (sc < bd && los(p.x, p.y, m.x, m.y)) { bd = sc; best = m; }
+  }
+  return best;
+}
+function pawnAI(p, dt) {
+  if (p.dismissT > 0) p.dismissT -= dt;
+  if (p.flash > 0) p.flash -= dt;
+  if (!p.following) { p.moving = false; return; }
+  if (p.down) { p.dead = 0.55; p.downT -= dt; if (p.downT <= 0) { p.down = false; p.dead = 0; p.hp = Math.ceil(p.maxhp * 0.5); pawnSay(p, "¡Me levanto!"); drawParty(); } return; }
+  p.cd -= dt; p.healCd -= dt; p.talkCd -= dt;
+  const cls = p.cls, dpl = Math.hypot(px - p.x, py - p.y), fi = Math.max(0, followers().indexOf(p)), side = fi % 2 ? 1 : -1;
+  if (!P.boat && p.mode !== "wait" && (dpl > 16 || p.stuck > 3)) {
+    const gx = px - Math.cos(ang) * 1.8 - Math.sin(ang) * side, gy = py - Math.sin(ang) * 1.8 + Math.cos(ang) * side;
+    if (!solidTile(gx, gy)) { p.x = gx; p.y = gy; } else { p.x = px; p.y = py; } p.stuck = 0;
+  }
+  if (cls === "clerigo" && p.healCd <= 0 && dpl < 9) {
+    if (!P.dead && P.hp <= P.max * 0.55) { P.hp = Math.min(P.max, P.hp + 2); drawHearts(); spawnNum(px, py, EYE, "+2", [120,255,150]); p.healCd = 12; pawnSay(p, "¡Te curo!"); }
+    else { const w = followers().find(o => o !== p && !o.down && o.hp <= o.maxhp * 0.5); if (w) { w.hp = Math.min(w.maxhp, w.hp + 4); p.healCd = 10; spawnNum(w.x, w.y, 1.4, "+4", [120,255,150]); drawParty(); } }
+  }
+  const tg = pawnTarget(p, p.mode === "attack" ? 14 : (p.mode === "wait" ? 4 : 9)), sp = 4.1 * dt, rr = 0.2;
+  if (tg) {
+    const dx = tg.x - p.x, dy = tg.y - p.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    if (p.talkCd <= 0 && p.spotted !== tg) { p.spotted = tg; p.talkCd = 7; pawnSay(p, spotLine(tg)); }
+    if (cls === "guerrero" || cls === "clerigo") {
+      p.moving = true; p.phase += dt * 6;
+      if (d > 1.4) moveActor(p, ux * sp, uy * sp, rr);
+      else if (p.cd <= 0) { p.cd = cls === "guerrero" ? 1.0 : 1.4; damageMob(tg, cls === "guerrero" ? 2 : 1, ux * 0.5, uy * 0.5); }
+    } else {
+      const keep = cls === "mago" ? 6.5 : 5.5;
+      p.moving = true; p.phase += dt * 5;
+      if (d < keep - 1.5) moveActor(p, -ux * sp, -uy * sp, rr); else if (d > keep + 2.5) moveActor(p, ux * sp, uy * sp, rr); else p.moving = false;
+      if (p.cd <= 0 && d < 11) {
+        p.cd = cls === "mago" ? 2.2 : 1.5;
+        const tz = (tg.fly ? tg.z : 0) + tg.h * 0.5;
+        if (cls === "arquero") fireArrow(p.x, p.y, 0.8, tg.x, tg.y, tz, 13, "player", 1); else fireBolt(p, tg, tz);
+      }
+    }
+    return;
+  }
+  if (p.mode === "wait" || P.boat) { p.moving = false; return; }
+  const gx = px - Math.cos(ang) * 2.3 - Math.sin(ang) * 1.4 * side, gy = py - Math.sin(ang) * 2.3 + Math.cos(ang) * 1.4 * side, dd = Math.hypot(gx - p.x, gy - p.y);
+  if (dd > 1.1) {
+    const sp2 = Math.min(5, 2 + dd) * dt, moved = moveActor(p, (gx - p.x) / dd * sp2, (gy - p.y) / dd * sp2, rr);
+    p.moving = moved; p.phase += dt * (dd > 3 ? 8 : 5); p.stuck = moved ? Math.max(0, p.stuck - dt) : p.stuck + dt;
+  } else { p.moving = false; p.stuck = 0; }
+  if (!P.dead && P.hp <= P.max * 0.3 && p.talkCd <= 0) { p.talkCd = 10; pawnSay(p, "¡Aguanta, voy a ayudarte!"); }
+}
+
+// ---- IA de enemigos con objetivo (jugador o peones) ----
+function pickTarget(a) {
+  let best = null, bd = 1e9;
+  if (!P.dead) { bd = Math.hypot(px - a.x, py - a.y); PLT.x = px; PLT.y = py; best = PLT; }
+  for (const p of PAWNS) { const d = Math.hypot(p.x - a.x, p.y - a.y); if (d < bd - 1.2 && d < 7) { bd = d; best = p; } }
+  return best;
+}
+function hitT(tg, dmg, a, push, kind) { if (tg.pl) hitPlayer(dmg, a, push, kind); else hurtPawn(tg, dmg); }
+function mobAI(a, dt) {
+  const M = MOB[a.type];
+  if (a.dead > 0) { a.dead += dt * 1.3; return; }
+  if (a.flash > 0) a.flash -= dt;
+  a.cd -= dt;
+  const tg = pickTarget(a), tx = tg ? tg.x : px, ty = tg ? tg.y : py;
+  const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy) || 0.001, ux = dx / d, uy = dy / d;
+  const range = a.type === "wolf" ? 18 : a.type === "skeleton" ? 13 : 9;
+  const seen = !!tg && d < range && los(a.x, a.y, tx, ty), rr = M.r - 0.04;
+  switch (a.type) {
+    case "zombie":
+      if (seen) { a.moving = true; a.phase += dt * 6;
+        if (d > M.range) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr);
+        else if (a.cd <= 0) { a.cd = M.cd; hitT(tg, M.dmg, a, 0.35); } }
+      else wander(a, dt, 0.35, rr);
+      break;
+    case "boss": case "golem": {
+      if (!a.aggro && seen && d < 10) a.aggro = true;
+      if (!a.aggro || !tg) { a.moving = false; break; }
+      const enr = a.hp < a.maxhp * 0.5, sp = M.speed * (enr ? 1.6 : 1) * dt;
+      a.moving = a.wind <= 0; a.phase += dt * 5;
+      if (a.wind > 0) { a.wind -= dt; a.flash = 0.05; if (a.wind <= 0) { if (Math.hypot(tg.x - a.x, tg.y - a.y) < 2.5) hitT(tg, M.dmg, a, 1.1, "slam"); a.cd = enr ? 1.6 : M.cd; } }
+      else if (d > 1.7) moveActor(a, ux * sp, uy * sp, rr);
+      else if (a.cd <= 0) a.wind = 0.6;
+      break;
+    }
+    case "skeleton":
+      if (seen) {
+        a.phase += dt * 4;
+        if (d < 3.4) { a.moving = true; moveActor(a, -ux * M.speed * dt, -uy * M.speed * dt, rr); }
+        else if (d > 8) { a.moving = true; moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr); }
+        else a.moving = false;
+        if (a.cd <= 0 && d < 12) { a.cd = M.cd + Math.random() * 0.8; if (tg.pl) fireArrow(a.x, a.y, 0.75, tx, ty, EYE - 0.3, 9, "enemy"); else if (Math.random() < 0.6) hurtPawn(tg, 1); }
+      } else wander(a, dt, 0.4, rr);
+      break;
+    case "spider":
+      if (seen) { a.moving = true; a.phase += dt * 12;
+        if (d > M.range) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr);
+        else if (a.cd <= 0) { a.cd = M.cd; hitT(tg, M.dmg, a, 0.2); } }
+      else wander(a, dt, 0.5, rr);
+      break;
+    case "bat": {
+      a.phase += dt * 10; a.moving = true;
+      const tz = seen && a.mode !== "retreat" ? (tg.pl ? Math.max(0.3, EYE - 0.45) : 0.5) : 1.1 + 0.35 * Math.sin(T * 3 + a.seed);
+      a.z += (tz - a.z) * Math.min(1, dt * 3);
+      if (a.mode === "retreat") { a.rt -= dt; moveActor(a, -ux * M.speed * dt, -uy * M.speed * dt, 0.18); if (a.rt <= 0) a.mode = "idle"; }
+      else if (seen) { a.mode = "attack";
+        if (d > 0.7) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, 0.18);
+        else if (a.cd <= 0) { a.cd = M.cd; hitT(tg, M.dmg, a, 0.1); a.mode = "retreat"; a.rt = 0.8; } }
+      else { a.dir += dt * 1.4; moveActor(a, Math.cos(a.dir) * 1.4 * dt, Math.sin(a.dir) * 1.4 * dt, 0.18); }
+      break;
+    }
+    case "wolf": {
+      const dpl = Math.hypot(px - a.x, py - a.y);
+      if (NF < 0.3 && dpl > 12) a.leave = true;
+      if (a.leave) { moveActor(a, -ux * M.speed * dt, -uy * M.speed * dt, rr); a.moving = true; a.phase += dt * 9; if (dpl > 26 || (NF < 0.15 && dpl > 14)) { a.hidden = true; a.dead = 2; } break; }
+      if (lampGlow(a.x, a.y) > 0.3) {
+        let lx = 0, ly = 0; for (const l of ACT) { lx += a.x - l[0]; ly += a.y - l[1]; }
+        const ll = Math.hypot(lx, ly) || 1; moveActor(a, lx / ll * M.speed * dt, ly / ll * M.speed * dt, rr); a.moving = true; a.phase += dt * 9; break;
+      }
+      if (seen) { a.moving = true; a.phase += dt * 9;
+        if (d > M.range) moveActor(a, ux * M.speed * dt, uy * M.speed * dt, rr);
+        else if (a.cd <= 0) { a.cd = M.cd; hitT(tg, M.dmg, a, 0.4); } }
+      else wander(a, dt, 0.8, rr);
+      break;
+    }
+  }
+}
+function updateActors(dt) {
+  PAWNS = (WORLD && WORLD.pawns) ? WORLD.pawns.filter(p => p.following && p.lv === LV && !p.down) : [];
+  for (let i = LV.act.length - 1; i >= 0; i--) {
+    const a = LV.act[i];
+    if (a.dead > 1.4) { LV.act.splice(i, 1); removeSprite(a); continue; }
+    if (a.type === "villager") villagerAI(a, dt); else if (a.type === "pawn") pawnAI(a, dt); else mobAI(a, dt);
+  }
+  partyTick(dt);
+}
+function updateMarkers() {
+  for (const v of LV.act) {
+    if (!v.marker) continue;
+    const m = v.marker;
+    m.x = v.x; m.y = v.y; m.z = 1.2 + 0.06 * Math.sin(T * 3 + v.seed);
+    if (v.type === "pawn") { m.kind = "p"; m.hidden = !!(v.following || v.down) || followers().length >= 2; continue; }
+    const q = QUESTS[v.qid], st = q ? qState(q) : "done";
+    m.kind = st === "new" ? "!" : (qReady(q) ? "?" : "");
+    m.hidden = !!v.hidden || !m.kind;
+  }
 }
 
 // ============================================================
@@ -2219,8 +3044,8 @@ addEventListener("keydown", e => {
   keys[k] = true;
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown", "home"].includes(k)) e.preventDefault();
   if (e.repeat) return;
-  if (k === "-") { OPT.font = Math.max(8, OPT.font - 1); FONT = OPT.font; fit(); saveOpts(); }
-  if (k === "=" || k === "+") { OPT.font = Math.min(18, OPT.font + 1); FONT = OPT.font; fit(); saveOpts(); }
+  if (k === "-") { if (OPT.style === "pixel") OPT.pxs = Math.max(2, OPT.pxs - 1); else { OPT.font = Math.max(8, OPT.font - 1); FONT = OPT.font; } fit(); saveOpts(); }
+  if (k === "=" || k === "+") { if (OPT.style === "pixel") OPT.pxs = Math.min(10, OPT.pxs + 1); else { OPT.font = Math.min(18, OPT.font + 1); FONT = OPT.font; } fit(); saveOpts(); }
   if (k === "n") { dayT = (dayT + 0.12) % 1; autoDay = false; }
   if (k === "h") autoDay = !autoDay;
   if (k === "m") { OPT.mini = !OPT.mini; miniOn = OPT.mini; saveOpts(); }
@@ -2230,7 +3055,9 @@ addEventListener("keydown", e => {
   if (k === "x") doDodge();
   if (k === "1") { P.wpn = 1; drawInv(); }
   if (k === "2" && P.bow) { P.wpn = 2; drawInv(); }
+  if (k === "3" && P.staff) { P.wpn = 3; drawInv(); }
   if (k === "q") eatMush();
+  if (k === "t") cyclePawnCmd();
   if (k === "f") { const s = $("scan"); s.style.display = s.style.display === "block" ? "none" : "block"; }
 });
 addEventListener("keyup", e => { const k = e.key.toLowerCase(); keys[k] = false; if (k === "j") attackUp(); });

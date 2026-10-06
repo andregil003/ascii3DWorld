@@ -9,6 +9,7 @@ Historial en este repo:
 - `v5` (desde `Downloads/index (1).html`, copiado byte-por-byte como `index.html`)
 - `v5 update 2026-10-01` (desde `Downloads/index (2).html`, copiado byte-por-byte como `index.html`, +23KB / +355 líneas)
 - `v5 update-2 2026-10-01` (desde `Downloads/index (3).html`, copiado byte-por-byte como `index.html`, +24KB)
+- `v5 update-3 2026-10-06` (desde `Downloads/index (2).html` re-editado, copiado byte-por-byte como `index.html`, 201KB)
 
 ## Controles (v5)
 
