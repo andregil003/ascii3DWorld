@@ -13,6 +13,7 @@ Historial en este repo:
 - `fix seed/save 2026-10-07` (editado directo en el repo, +66/−7)
 - `fix controles/móvil 2026-10-07` (editado directo en el repo, +52/−7)
 - `fix robustez 2026-10-07` (editado directo en el repo, +114/−18)
+- `fix hexCache 2026-10-07` (editado directo en el repo, +12/−1)
 
 ## Controles (v5)
 
@@ -90,6 +91,21 @@ minimapa) corría invisible tras `rgba(0,0,0,.84)`. Quemaba batería en portáti
 y competía con el rAF de la UI. Ahora el menú refresca a 4fps: el fondo sigue
 vivo, con una fracción del trabajo. En juego se renderiza en cada frame como
 antes (verificado: `renders=17` para `framesRAF=17`).
+
+### fix hexCache — 2026-10-07
+
+`hex()` se llama unas 200 veces por frame (una por columna), así que la cache está
+justificada. El problema era que no tenía tope: los colores del cielo y la niebla se
+recalculan con valores flotantes cada frame (`pack(190 * vis, 210 * vis, ...)`) y el
+enmascarado `&252` deja 64 niveles por canal, o sea hasta **64³ = 262.144 claves
+distintas** a lo largo de una partida. Eso son ~26 MB de basura acumulada sin límite.
+
+Ahora el `Map` se vacía al superar 4096 entradas. Como la cache es puramente
+aceleradora (reformatear un entero a hex es barato), perderla no afecta nada. En una
+simulación de 300 frames de cielo más 1.000 colores distintos la cache se queda en
+535 entradas (~52 KB) en vez de crecer sin control.
+
+**Sin QA en navegador** (revisión de código y simulación de la lógica en node).
 
 ### fix robustez y móvil — 2026-10-07
 
