@@ -8,7 +8,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; background: #05080a;
     font-family: "Cascadia Mono", Consolas, Menlo, monospace; }
-  #wrap { height: 100vh; width: 100vw; display: flex; flex-direction: column; }
+  /* 100dvh: en móvil 100vh mide el viewport CON la barra de direcciones Visible, así que
+     al ocultarse la barra el canvas queda desalineado. dvh sigue al viewport real.
+     safe-area: evita que la muesca del iPhone tape el HUD. */
+  #wrap { height: 100vh; height: 100dvh; width: 100vw; display: flex; flex-direction: column; }
   #topbar { display: flex; gap: 18px; align-items: center; padding: 6px 14px;
     font-size: 12px; letter-spacing: 1px; z-index: 10;
     background: rgba(0,0,0,.55); color: #d8ffd8; white-space: nowrap; }
@@ -37,10 +40,14 @@
     font-size: 14px; line-height: 1.5; padding: 8px 16px; border-radius: 6px; text-align: center;
     background: rgba(10,14,12,.78); color: #eafbe6; border: 1px solid rgba(255,255,255,.18);
     opacity: 0; transition: opacity .4s; pointer-events: none; }
-  #toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  /* nowrap hacia que a 320px de ancho midiera 692px y se saliera por ambos lados,
+     solapando el inventario. Ahora envuelve y se limita al viewport. */
+  #toast { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%);
     font-size: 12px; padding: 4px 12px; border-radius: 4px; z-index: 4; transition: opacity 1.2s;
-    background: rgba(0,0,0,.6); color: #d8ffd8; pointer-events: none; white-space: nowrap; }
-  #inv { position: absolute; left: 14px; bottom: 14px; z-index: 4; display: flex; gap: 8px; align-items: center; font-size: 14px;
+    background: rgba(0,0,0,.6); color: #d8ffd8; pointer-events: none;
+    max-width: min(92vw, 620px); white-space: normal; text-align: center;
+    max-height: 4.6em; overflow: hidden; }
+  #inv { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); z-index: 4; display: flex; gap: 8px; align-items: center; font-size: 14px;
     color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; }
   #inv .it { padding: 2px 8px; border-radius: 4px; background: rgba(0,0,0,.5); }
   #inv .sl { padding: 2px 8px; border-radius: 4px; background: rgba(0,0,0,.35); opacity: .55; }
@@ -70,7 +77,11 @@
   #opts input[type=range] { width: 150px; }
   #help { font-size: 12px; opacity: .8; max-width: 640px; margin: 8px auto 0; }
   #screen { touch-action: none; }
-  #touch { position: absolute; inset: 0; z-index: 5; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+  /* safe-area-inset: en iPhone con notch los botones (tMenu a top:1vmin) caían bajo la
+     muesca. El inset se resta como padding para que los controles queden dentro. */
+  #touch { position: absolute; inset: 0; z-index: 5; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none;
+    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
   #touch > * { pointer-events: auto; touch-action: none; }
   #lookpad { position: absolute; right: 0; top: 0; width: 58%; height: 100%; }
   #joy { position: absolute; left: 4vmin; bottom: 6vmin; width: 26vmin; height: 26vmin; border-radius: 50%; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.3); }
@@ -88,9 +99,12 @@
   #chat { position: absolute; left: 14px; bottom: 54px; z-index: 4; font-size: 13px; padding: 4px 10px; border-radius: 6px; background: rgba(8,16,28,.75);
     color: #cfe6ff; opacity: 0; transition: opacity .3s; pointer-events: none; }
   #tCmd { right: 5vmin; bottom: 49vmin; width: 11vmin; height: 11vmin; }
+  /* Con el contenido centrado y overflow:hidden en body, a <=500px de alto el menu se
+     recortaba por arriba y era inalcanzable (no habia forma de hacer scroll). */
   #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,.84); color: #d8ffd8; font-size: 14px; line-height: 1.8;
-    text-align: center; cursor: pointer; z-index: 6; padding: 20px; }
+    text-align: center; cursor: pointer; z-index: 6; padding: 20px;
+    overflow-y: auto; -webkit-overflow-scrolling: touch; }
   #overlay.hidden { display: none; }
   #overlay .big { font-size: 26px; letter-spacing: 3px; }
 </style>
@@ -149,6 +163,24 @@
     </div></div>
   </div>
 </div>
+<style>
+  /* Pantallas bajas (movil en landscape): el menu y la ayuda se apretan para que
+     todo quepa sin depender del scroll. */
+  @media (max-height: 560px) {
+    #overlay { padding: 10px 14px; align-items: flex-start; }
+    #overlay .big { font-size: 19px; letter-spacing: 1px; }
+    #overlay { font-size: 12px; line-height: 1.45; }
+    #help { font-size: 10.5px; line-height: 1.4; max-width: 96vw; margin: 5px auto 0; }
+    #opts { gap: 4px 12px; }
+    #opts label { font-size: 11px; }
+    #opts input[type=range] { width: 96px; }
+    #menu button { font-size: 13px; padding: 6px 9px; }
+  }
+  /* Respeta la preferencia de movimiento reducido: quita destellos y transiciones. */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
 <script>
 "use strict";
 // ============================================================
@@ -412,7 +444,7 @@ function genOverworld(seed) {
   let far2 = cands.filter(c => Math.hypot(c.x - cd.x, c.y - cd.y) >= 14); if (!far2.length) far2 = cands.filter(c => Math.hypot(c.x - cd.x, c.y - cd.y) >= 6);
   if (!far2.length) return null;
   const md2 = far2[Math.floor(R() * far2.length)];
-  const doors = [];
+  // (antes: const doors = [] — declarado y nunca usado)
   for (const [c, tch, nm] of [[cd, "C", "caveDoor"], [md2, "N", "mineDoor"]]) {
     Lv.grid[c.y][c.x] = tch; Lv.hg[c.y * W + c.x] = 3.2;
     Lv[nm] = { x: c.x, y: c.y, outX: c.x + c.dx + 0.5, outY: c.y + c.dy + 0.5, ang: Math.atan2(c.dy, c.dx) };
@@ -792,7 +824,7 @@ const KEYS = [
   [1.00, [64,72,130],  [244,170,120], [1.00,0.82,0.72], 0.78],
 ];
 const ST = [0,0,0], SH = [0,0,0], TN = [1,1,1], FOGc = [0,0,0];
-let L = 1, NF = 0, LR = 1, LG = 1, LB = 1, FL = 0, GLOWK = 0, phaseName = "", FOG0 = 8, FOG1 = 40;
+let L = 1, NF = 0, LR = 1, LG = 1, LB = 1, FL = 0, GLOWK = 0, phaseName = "", FOG0 = 8, FOG1 = 40, clockS = -1;
 let sunEl = 0, moonEl = -1, sunAz = -1.2, moonAz = -1.2, SDX = 0, SDY = -1, SHTAN = 1, SHSTR = 0;
 const ACT = [];
 function envUpdate() {
@@ -925,7 +957,7 @@ function floorOver(i, wx, wy, d) {
     else if (sunEl > 0.1 && W.cloud < 0.6 && hash(wx * 6 + Math.floor(T * 3), wy * 6) > 0.985) { sFg[0] = 255; sFg[1] = 255; sFg[2] = 240; sCh = 42; }
     else { mix(sFg, WAT_B, [190,235,255], t); sCh = t > 0.5 ? 126 : 45; }
     fogF = Math.max(fogF, 0.1);
-    if (W.snowG > 0.4 && W.snow > 0.3) { /* agua no se congela */ }
+    
   } else {
     if (ft === "plaza") {
       const sx2 = Math.floor(wx * 3 + (iy & 1) * 0.5), sy2 = Math.floor(wy * 2.4), tone = 0.9 + 0.2 * hash(sx2, sy2);
@@ -1407,7 +1439,6 @@ function spritePixel(s, u, v) {
         S(G, 0.85 + 0.3 * hash(u * 14, v * 14), [170,168,178], 1, "#", 0); return true;
       }
       if (v > 0.46 && v < 0.88 && ax < 0.16 + (v - 0.46) * 0.2) {
-        if (v > 0.8 && !(ax > 0.05 && ax < 0.12) && !(ax > 0.16)) { }
         if (v > 0.8) { if ((ax > 0.06 && ax < 0.115) || (ax > 0.155 && ax < 0.21)) { S(D, 0.9, [140,138,150], 1, "|", 0); return true; } return false; }
         S(ax < 0.06 ? [176,174,182] : D, 0.85 + 0.3 * hash(u * 12, v * 12), [150,148,160], 1, "%", 0); return true;
       }
@@ -1891,8 +1922,11 @@ function render(dt) {
   EYE = EYE0 + pz - (P.dodgeT > 0 ? 0.28 * Math.sin(Math.PI * (1 - P.dodgeT / 0.24)) : 0) + (P.boat ? 0.14 + 0.04 * Math.sin(T * 2.2) : 0);
   const dirX = Math.cos(ang), dirY = Math.sin(ang), plX = -dirY * TAN, plY = dirX * TAN;
   const hz = Math.round(ROWS * 0.5 + Math.tan(pitch) * PK), over = LV.type === "over", CEIL = LV.ceil;
-  const now = new Date();
-  clockM = (now.getMinutes() + now.getSeconds() / 60) / 60 * Math.PI * 2; clockH = ((now.getHours() % 12) + now.getMinutes() / 60) / 12 * Math.PI * 2;
+  // El reloj del reloj de sol usa la hora real. Antes se creaba un Date() por frame
+  // (60 objetos/s basura); ahora solo cuando cambia el minuto o la hora.
+  const nowS = Math.floor(performance.now() / 1000);
+  if (nowS !== clockS) { clockS = nowS; const now = new Date();
+    clockM = (now.getMinutes() + now.getSeconds() / 60) / 60 * Math.PI * 2; clockH = ((now.getHours() % 12) + now.getMinutes() / 60) / 12 * Math.PI * 2; }
   if (over) {
     sunC = bodyCol(sunAz, hz); sunOn = sunEl > 0 && sunC > -900; sunR = hz - Math.tan(Math.max(0, sunEl) * 1.2) * PK;
     moonC = bodyCol(moonAz, hz); moonOn = moonEl > 0 && moonC > -900; moonR = hz - Math.tan(Math.max(0, moonEl) * 1.2) * PK;
@@ -1970,7 +2004,7 @@ function presentAscii() {
 // ============================================================
 //  MINIMAPA (solo colores)
 // ============================================================
-const mini = $("mini"), mctx = mini.getContext("2d"); let miniOn = true, MSC = 2;
+const mini = $("mini"), mctx = mini.getContext("2d"); let miniOn = true;
 function buildMini(Lv) {
   if (Lv.mm) return Lv.mm;
   const sc = Lv.W > 60 ? 2 : 3, cvs = document.createElement("canvas"); cvs.width = Lv.W * sc; cvs.height = Lv.H * sc; Lv.mmScale = sc;
@@ -1991,8 +2025,14 @@ function drawMini() {
   if (!miniOn || LV.type === "house") { mini.style.display = "none"; return; }
   mini.style.display = "block";
   const mm = buildMini(LV), sc = LV.mmScale;
-  if (mini.width !== mm.width) { mini.width = mm.width; mini.height = mm.height; }
+  // El minimapa no aplicaba devicePixelRatio: en retina el buffer era 300x150 mostrado
+  // a 190px (ratio 0.63) y se veía borroso. Ahora el buffer se escala por DPR y el
+  // contexto trabaja en coordenadas lógicas, así que el resto del dibujo no cambia.
+  const mDpr = Math.min(2, (typeof devicePixelRatio !== "undefined" && devicePixelRatio) || 1);
+  const bw = Math.round(mm.width * mDpr), bh = Math.round(mm.height * mDpr);
+  if (mini.width !== bw || mini.height !== bh) { mini.width = bw; mini.height = bh; }
   { const f = Math.min(1, 190 / mm.width); mini.style.width = (mm.width * f) + "px"; mini.style.height = (mm.height * f) + "px"; }
+  mctx.setTransform(mDpr, 0, 0, mDpr, 0, 0);
   mctx.drawImage(mm, 0, 0);
   const cx = px * sc, cy = py * sc;
   mctx.fillStyle = "rgba(255,255,255,.22)"; mctx.beginPath(); mctx.moveTo(cx, cy);
@@ -2162,7 +2202,20 @@ function villagerAI(a, dt) {
 // ============================================================
 function readJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
 const SAVE_KEY = "asciifps5", OPT_KEY = "asciifps5opts";
-const OPT = Object.assign({ sens: 1, invY: false, font: 12, fov: 74, mini: true, nums: true, auto: true, touch: "auto", style: "pixel", pxs: 5, dither: false }, readJSON(OPT_KEY));
+const OPT_DEFAULT = { sens: 1, invY: false, font: 12, fov: 74, mini: true, nums: true, auto: true, touch: "auto", style: "pixel", pxs: 5, dither: false };
+// Los bounds son los min/max reales de los inputs del menú. Sin esta validación,
+// un localStorage corrupto (o editado a mano) con fov=0 daba TAN=0 -> PK=Infinity
+// -> NaN en toda la pantalla, sin error visible.
+const OPT_RANGE = { sens: [0.3, 2.5], font: [8, 18], fov: [60, 100], pxs: [2, 10] };
+const OPT_ENUM = { style: ["pixel", "ascii"], touch: ["auto", "on", "off"] };
+const OPT = Object.assign({}, OPT_DEFAULT, readJSON(OPT_KEY));
+for (const k in OPT_DEFAULT) {
+  const d = OPT_DEFAULT[k], v = OPT[k], r = OPT_RANGE[k];
+  if (r) { const n = typeof v === "number" ? v : parseFloat(v); OPT[k] = Number.isFinite(n) ? Math.min(r[1], Math.max(r[0], n)) : d; }
+  else if (OPT_ENUM[k]) { OPT[k] = OPT_ENUM[k].includes(v) ? v : d; }
+  else if (typeof v !== typeof d) OPT[k] = d;
+  else if (typeof d === "number" && !Number.isFinite(v)) OPT[k] = d;
+}
 function saveOpts() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} }
 let noteT = 0;
 function note(t) { const n = $("note"); n.textContent = t; n.style.opacity = 1; clearTimeout(noteT); noteT = setTimeout(() => { n.style.opacity = 0; }, 1800); }
@@ -2414,7 +2467,9 @@ function swordHit(heavy) {
   for (const a of LV.act) {
     if (!a.mob || a.dead > 0 || a.hidden) continue;
     const dx = a.x - px, dy = a.y - py, d = Math.hypot(dx, dy);
-    if (d < rg && (dx * cs + dy * sn) / (d || 1) > cone) damageMob(a, dmg, dx / (d || 1) * kb, dy / (d || 1) * kb);
+    // los() evita golpear a través de paredes: sin él, un enemigo a <2.5m detrás de una
+    // pared recibía daño, algo fácil en las aldeas compactas (casas pegadas, setos).
+    if (d < rg && (dx * cs + dy * sn) / (d || 1) > cone && los(px, py, a.x, a.y)) damageMob(a, dmg, dx / (d || 1) * kb, dy / (d || 1) * kb);
   }
 }
 function pickups() {
@@ -2571,6 +2626,11 @@ function doTrigger(tr) {
   } else if (tr.t === "S" && LV.mine) { const next = WORLD.mines[LV.mine]; goto(next, next.up.outX, next.up.outY, next.up.ang); }
 }
 function goto(level, x, y, a) {
+  // Los proyectiles en vuelo pertenecen al nivel que se abandona. updateProjectiles
+  // solo borra los que salen del mapa, asi que al cruzar una puerta quedaban
+  // congelados para siempre en LV.spr y se acumulaban en cada transicion.
+  for (const pr of (LV.prj || []).slice()) removeSprite(pr);
+  if (LV.prj) LV.prj.length = 0;
   const fol = detachFollowers();
   setLevel(level); px = x; py = y; ang = a; pitch = 0; pz = 0; vz = 0; P.tcool = 0.9; FXL.length = 0; fadeFlash(); attachFollowers(fol, x, y);
   if (level.mine === 1 && !level.visited) say("Huele a polvo y madera vieja. Los rieles se pierden en la oscuridad…", 3600);
@@ -2660,8 +2720,11 @@ function drawInv() {
   $("inv").innerHTML = s;
 }
 function resetPlayer() {
-  Object.assign(P, { hp: 10, max: 10, swing: -1, dead: false, sword: 0, shield: false, bow: false, staff: false, boat: null, wpn: 1, kills: 0, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5,
-    sta: 100, staMax: 100, staDelay: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0, cactusCd: 0 });
+  // regen/hurtT/hitDone/lastHit tambien se reinician: son timers y el acumulador de
+  // curacion que arrastraban valores de la partida anterior al empezar una nueva.
+  Object.assign(P, { hp: 10, max: 10, swing: -1, hitDone: false, dead: false, sword: 0, shield: false, bow: false, staff: false, boat: null, wpn: 1, kills: 0, shotCd: 0, shotAnim: 0, blocking: false, blockFlash: 0, wolfT: 5,
+    sta: 100, staMax: 100, staDelay: 0, regen: 0, hurtT: 0, lastHit: null, lastHitT: 0, charging: false, chargeT: 0, heavy: false, dodgeT: 0, cdDodge: 0, inv: 0, staFlash: 0, saveT: 0, cactusCd: 0 });
+  keys = {}; mouseR = false; TOUCH.fw = 0; TOUCH.st = 0; TOUCH.run = false; TOUCH.block = false;
   INV.coin = 0; INV.crystal = 0; INV.mush = 0; INV.arrow = 0; INV.ore = 0; INV.gold = 0; INV.tome = 0; offerI = -1; offerT = 0; mageT = 0; pawnCmdMode = "follow"; $("party").innerHTML = "";
   for (const k in QS) delete QS[k]; FXL.length = 0;
 }
@@ -2870,13 +2933,27 @@ function mkPawn(Lv, cls, x, y, idx) {
 function followers() { return (WORLD && WORLD.pawns) ? WORLD.pawns.filter(p => p.following) : []; }
 function detachFollowers() {
   const fs = followers();
-  for (const p of fs) { const l = p.lv, i = l.act.indexOf(p); if (i >= 0) l.act.splice(i, 1); const k = l.spr.indexOf(p); if (k >= 0) l.spr.splice(k, 1); }
+  // El marker tambien sale del nivel abandonado: updateMarkers solo actualiza los que
+  // estan en LV.act, asi que se quedaba huerfano (hidden) con coordenadas del nivel
+  // nuevo y se acumulaban ~4 sprites invisibles en cada transicion.
+  for (const p of fs) {
+    const l = p.lv; const i = l.act.indexOf(p); if (i >= 0) l.act.splice(i, 1);
+    const k = l.spr.indexOf(p); if (k >= 0) l.spr.splice(k, 1);
+    if (p.marker) { const k2 = l.spr.indexOf(p.marker); if (k2 >= 0) l.spr.splice(k2, 1); p.marker = null; }
+  }
   return fs;
 }
 function attachFollowers(fs, x, y) {
   const offs = [[-0.7, 0.4], [0.7, 0.4], [0, -0.8], [0, 0.8], [-1.2, 0], [1.2, 0], [0, 0]];
   fs.forEach((p, i) => {
-    p.lv = LV; LV.act.push(p); LV.spr.push(p); p.mode = pawnCmdMode; p.stuck = 0;
+    p.lv = LV; LV.act.push(p); LV.spr.push(p); p.stuck = 0;
+    // detachFollowers retiro el marker del nivel viejo (quedaba huerfano con coords
+    // del nuevo), asi que se recrea aqui. Y el modo individual guardado por el save
+    // se respeta: p.mode = pawnCmdMode lo pisaba y se perdia "atacar/esperar" por peon.
+    // add() empuja a Lv.spr pero no guarda referencia al nivel, asi que se comprueba
+    // si el marker sigue en el spr del nivel actual antes de reutilizarlo.
+    if (!p.marker || LV.spr.indexOf(p.marker) < 0) p.marker = add(LV, "marker", p.x, p.y, { w: 0.22, h: 0.32, z: 1.2, sh: 0, kind: "p" });
+    if (p.mode === undefined || p.mode === null) p.mode = pawnCmdMode;
     let ok = false;
     for (let k = 0; k < offs.length && !ok; k++) { const o = offs[(k + i) % offs.length], nx = x + o[0], ny = y + o[1]; if (!solidTile(nx, ny)) { p.x = nx; p.y = ny; ok = true; } }
     if (!ok) { p.x = x; p.y = y; }
@@ -3148,6 +3225,22 @@ addEventListener("keydown", e => {
 });
 addEventListener("keyup", e => { const k = keyOf(e); keys[k] = false; if (k === "j") attackUp(); });
 addEventListener("blur", () => { keys = {}; mouseR = false; if (P.charging) { P.charging = false; P.chargeT = 0; } });
+// Al ocultar la pestaña o cambiar de app en movil el bucle sigue con el dt acumulado
+// y el reloj del mundo (T, dayT) sigue avanzando: al volver, la noche habia pasado.
+// Se pausa el reloj y se avisa, sin tocar el autoguardado del jugador.
+let wasPlaying = false;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    if (!menuOpen && !locked) { wasPlaying = true; showMenu("Pausa · el tiempo del mundo se detuvo"); }
+    keys = {}; mouseR = false;
+    if (document.exitPointerLock && locked) { try { document.exitPointerLock(); } catch (e) {} }
+  } else if (wasPlaying) {
+    wasPlaying = false;
+    try { screen.requestPointerLock(); } catch (e) {}
+  }
+});
+// Al ocultar la barra de direcciones, el viewport cambia sin disparar resize.
+if (window.visualViewport) visualViewport.addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(fit, 150); });
 overlay.addEventListener("click", e => {
   if (Date.now() < suppressClickUntil) return;            // click sintetizado tras abrir el menú
   const b = e.target && e.target.closest ? e.target.closest("button,input,label,select") : null;
@@ -3167,7 +3260,14 @@ document.addEventListener("pointerlockchange", () => {
   locked = document.pointerLockElement === screen;
   if (locked) { overlay.classList.add("hidden"); menuOpen = false; } else if (!touchPlaying && !menuOpen) showMenu();
 });
-document.addEventListener("pointerlockerror", () => { overlay.classList.add("hidden"); menuOpen = false; });
+// Si el navegador rechaza el bloqueo (iframe sin allow, cooldown tras Esc en Chrome,
+// kiosco), antes se ocultaba el menu sin decir nada y el juego se quedaba sin control
+// de camara: el raton solo giraba con el boton pulsado. Ahora se avisa y se ofrece
+// arrastrar para mirar.
+document.addEventListener("pointerlockerror", () => {
+  overlay.classList.add("hidden"); menuOpen = false;
+  if (!touchPlaying) say("El navegador bloqueó el ratón: arrastra con el botón pulsado para mirar", 5000);
+});
 document.addEventListener("mousemove", e => {
   if (!menuOpen && (locked || (e.buttons & 1))) { ang += e.movementX * 0.0026 * OPT.sens; pitch = clamp(pitch - e.movementY * 0.0026 * OPT.sens * (OPT.invY ? -1 : 1), -1.35, 1.35); }
 });

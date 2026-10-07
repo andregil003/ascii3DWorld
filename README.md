@@ -12,6 +12,7 @@ Historial en este repo:
 - `v5 update-3 2026-10-06` (desde `Downloads/index (2).html` re-editado, copiado byte-por-byte como `index.html`, 201KB)
 - `fix seed/save 2026-10-07` (editado directo en el repo, +66/−7)
 - `fix controles/móvil 2026-10-07` (editado directo en el repo, +52/−7)
+- `fix robustez 2026-10-07` (editado directo en el repo, +114/−18)
 
 ## Controles (v5)
 
@@ -90,6 +91,60 @@ y competía con el rAF de la UI. Ahora el menú refresca a 4fps: el fondo sigue
 vivo, con una fracción del trabajo. En juego se renderiza en cada frame como
 antes (verificado: `renders=17` para `framesRAF=17`).
 
+### fix robustez y móvil — 2026-10-07
+
+Nueve correcciones de robustez, layout y limpieza. Verificadas por revisión de
+código (`node --check` sobre el JS extraído y balance de llaves en los CSS);
+**sinQA en navegador**, pendiente de prueba manual.
+
+**Layout / móvil**
+
+1. `100dvh` + `env(safe-area-inset-*)`. En móvil `100vh` mide el viewport con la
+   barra de direcciones visible, así que al ocultarse el canvas quedaba
+   desalineado. Los botones caían bajo la muesca del iPhone; ahora el inset se
+   resta como padding en `#touch` y con `max()` en `#inv`/`#toast`.
+2. `#toast` desbordaba. Con `white-space:nowrap` a 320px de ancho medía 692px y se
+   salía por ambos lados, solapando el inventario. Ahora envuelve, con `max-width:
+   min(92vw, 620px)` y tope de altura.
+3. Menú recortado en pantallas bajas. `#overlay` ahora tiene `overflow-y: auto` y
+   un bloque `@media (max-height: 560px)` que aprieta tipografía, menú y opciones
+   para que todo quepa en landscape (844×390) sin depender del scroll.
+4. Minimapa sin DPR. El buffer era 300×150 mostrado a 190px (ratio 0.63): borroso en
+   cualquier retina. Ahora el buffer se escala por `devicePixelRatio` (tope 2) y el
+   contexto trabaja en coordenadas lógicas con `setTransform`, así que el resto del
+   dibujo no cambia.
+5. `prefers-reduced-motion: reduce` respetado. Antes se ignoraba por completo;
+   ahora desactiva transiciones y animaciones.
+
+**Comportamiento**
+
+6. `visibilitychange`. Al ocultar la pestaña o cambiar de app el bucle seguía con el
+   `dt` acumulado y el reloj del mundo (`T`, `dayT`) avanzaba: al volver, la noche
+   había pasado. Ahora abre el menú avisando que el tiempo se detuvo, libera el
+   puntero y limpia las teclas. También se escucha `visualViewport` para el caso en
+   que la barra de direcciones se oculta sin disparar `resize`.
+7. `pointerlockerror` sin aviso. Si el navegador rechazaba el bloqueo (iframe sin
+   `allow`, cooldown tras Esc, kiosco) el overlay se ocultaba sin decir nada y el
+   juego se quedaba sin control de cámara. Ahora avisa que se puede arrastrar con
+   el botón pulsado.
+
+**Lógica / limpieza**
+
+8. Proyectiles congelados y markers huérfanos. `goto()` no limpiaba `LV.prj`, así
+   que las flechas en vuelo quedaban pegadas en el nivel abandonado para siempre.
+   `detachFollowers()` tampoco retiraba el `marker` del peón, y como
+   `updateMarkers()` solo actualiza los que están en `LV.act`, se acumulaban sprites
+   invisibles (~4 por transición). El marker se recrea al volver. También se respetó
+   el modo individual de cada peón, que `p.mode = pawnCmdMode` pisaba al guardar.
+9. Opciones corruptas. Un `localStorage` editado a mano con `fov=0` daba `TAN=0` →
+   `PK=Infinity` → NaN en pantalla sin error visible. Ahora los valores se validan y
+   se clampean contra los `min/max` reales de los inputs, con defaults por tipo. Se
+   reinforcement `resetPlayer()` con `regen`, `hurtT`, `hitDone`, `lastHit`,
+   `lastHitT` y limpieza de teclas/estado táctil. `swordHit()` ahora comprueba
+   línea de visión (`los()`) para no golpear a través de paredes. Y se eliminó el
+   código muerto: `doors`, `MSC`, dos `if` vacíos, y el `new Date()` por frame del
+   reloj de sol (ahora se recalcula solo al cambiar de minuto).
+
 ### fix seed/save — 2026-10-07
 
 Corregidos dos bugs críticos que rompían la carga de partidas. Verificados con
@@ -120,16 +175,12 @@ El arranque completo va en `try/catch`.
 Efecto secundario: los saves guardados antes de este fix se descartan al
 cargar, porque su seed estaba desplazado.
 
-**Pendiente (auditoría de compatibilidad, sin aplicar todavía)**
+**Pendiente**
 
-- `pointerlockerror` oculta el overlay sin avisar
-- `100vh` sin `100dvh` ni `env(safe-area-inset-*)` (notch, barra de direcciones)
-- `#toast` desborda en pantallas angostas y solapa con el inventario
-- Menú recortado sin scroll en pantallas de 500px de alto o menos
-- `#mini` no aplica DPR: se ve borroso en pantallas retina
-- Sin `visibilitychange`: al cambiar de app el reloj del mundo sigue corriendo
-- `prefers-reduced-motion` se ignora
-- `pointerlockerror` deja el juego sin control de cámara sin avisar al jugador
+- Verificar el lote robustez en navegador real (móvil landscape, portrait, retina).
+  Este lote se validó por revisión de código, no con tests automatizados.
+- `hexCache` (`Map` sin tope) es un riesgo teórico de memoria a largo plazo.
+- Sin audio: el juego no tiene sonidos de ataque ni de clima.
 
 ## Deploy
 
