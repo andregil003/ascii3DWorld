@@ -2242,8 +2242,20 @@ function applyTaken(lv, list) {
 
 // ---- menú / opciones ----
 let menuOpen = true, touchPlaying = false, newArm = 0;
+// Ventana durante la cual overlay:click no debe arrancar la partida (ver tMenu).
+let suppressClickUntil = 0;
+// Ultimo frame dibujado con el menú abierto (ver loop).
+let lastMenuRender = 0;
+// ¿El dispositivo tiene un puntero fino (ratón/trackpad)? En híbridos como Surface,
+// iPad+trackpad o Chromebook, "ontouchstart" da true y antes eso apagaba el ratón:
+// nunca se pedía pointer lock y el click izquierdo no atacaba.
+function hasFine() {
+  try { return typeof matchMedia === "function" && matchMedia("(pointer:fine)").matches; } catch (e) { return false; }
+}
 function isTouch() {
-  if (OPT.touch === "on") return true; if (OPT.touch === "off") return false;
+  if (OPT.touch === "on") return true;
+  if (OPT.touch === "off") return false;
+  if (hasFine()) return false;   // hay ratón: no forzamos modo táctil
   return (typeof matchMedia === "function" && matchMedia("(pointer:coarse)").matches) || (typeof window !== "undefined" && "ontouchstart" in window);
 }
 function refreshMenu() { $("bLoad").style.display = hasSave() ? "" : "none"; $("bPlay").textContent = P.dead ? "Reaparecer" : "Jugar"; }
@@ -2251,7 +2263,11 @@ function showMenu(msg) { menuOpen = true; P.charging = false; overlay.classList.
 function play() {
   if (P.dead) respawn();
   overlay.classList.add("hidden"); menuOpen = false;
-  if (isTouch()) touchPlaying = true; else { touchPlaying = false; try { screen.requestPointerLock(); } catch (e) {} }
+  // En híbridos manda el ratón: isTouch() da false si hay puntero fino, así que no se
+  // construye el HUD táctil (que occupationía el lado derecho y robaba el ratón) y sí
+  // se pide pointer lock. Antes el táctil ganaba siempre y el ratón quedaba muerto.
+  if (isTouch()) touchPlaying = true; else touchPlaying = false;
+  if (!touchPlaying && !P.dead) { try { screen.requestPointerLock(); } catch (e) {} }
 }
 function applyOpts() {
   FONT = OPT.font; miniOn = OPT.mini; setFov(OPT.fov);
@@ -2317,7 +2333,11 @@ function buildTouch() {
   hold("tDodge", doDodge); hold("tUse", interact); hold("tEat", eatMush); hold("tCmd", cyclePawnCmd);
   hold("tBlk", () => { TOUCH.block = true; }, () => { TOUCH.block = false; });
   hold("tWpn", () => { const o = [1]; if (P.bow) o.push(2); if (P.staff) o.push(3); P.wpn = o[(o.indexOf(P.wpn) + 1) % o.length]; drawInv(); });
-  $("tMenu").addEventListener("pointerdown", e => { showMenu(); e.preventDefault(); e.stopPropagation(); });
+  // El navegador despacha un `click` sintetizado tras el pointerup. Ese click llegaba a
+  // #overlay (ya visible por debajo de #touch) y ejecutaba play(), cerrando el menú en el
+  // mismo gesto. preventDefault NO lo evita, porque el click se dispara sobre #overlay.
+  // Solución: marcar una ventana de supresión que overlay:click respeta.
+  $("tMenu").addEventListener("pointerdown", e => { suppressClickUntil = Date.now() + 450; showMenu(); e.preventDefault(); e.stopPropagation(); });
 }
 
 function hurt(n) {
@@ -2410,7 +2430,11 @@ function pickups() {
 }
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (menuOpen) render(0); else step(dt);
+  // Con el menú abierto no se avanza el mundo, así que renderizar el raycaster a
+  // 60fps detrás del overlay es trabajo invisible que solo gasta batería (y compite
+  // con el rAF de la UI). Se refresca a 4fps: mantiene el fondo vivo sin quemar CPU.
+  if (menuOpen) { if (now - lastMenuRender >= 250) { lastMenuRender = now; render(0); } }
+  else step(dt);
   frames++; ftime += dt;
   if (ftime >= 1.5) {
     const fps = frames / ftime;
@@ -3085,12 +3109,26 @@ function newWorld(seed) {
 // ============================================================
 //  INPUT
 // ============================================================
+// Mapeo por e.code para que AZERTY/Dvorak funcionen: en esas distribuciones la tecla
+  // física W produce key="z", así que el juego no registraba la marcha. Se cae a e.key
+  // para teclados o IDEs que no reporten code.
+const CODEMAP = { KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright",
+    Space: " ", PageUp: "pageup", PageDown: "pagedown", Home: "home", ShiftLeft: "shift", ShiftRight: "shift", KeyK: "k",
+    Digit1: "1", Digit2: "2", Digit3: "3", Minus: "-", Equal: "=" };
+function keyOf(e) {
+  const c = CODEMAP[e.code];
+  if (c) return c;
+  const k = (e.key || "").toLowerCase();
+  // "=" llega como "+" con shift en algunos teclados; "-" como "_".
+  return k === "+" ? "=" : k === "_" ? "-" : k;
+}
 addEventListener("keydown", e => {
-  const k = e.key.toLowerCase();
+  const k = keyOf(e);
   if (k === "escape") { if (!locked && !touchPlaying && !menuOpen) showMenu(); return; }
   if (menuOpen) return;
   keys[k] = true;
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown", "home"].includes(k)) e.preventDefault();
+  if (k === "tab") e.preventDefault();   // evita que el foco salte del canvas
   if (e.repeat) return;
   if (k === "-") { if (OPT.style === "pixel") OPT.pxs = Math.max(2, OPT.pxs - 1); else { OPT.font = Math.max(8, OPT.font - 1); FONT = OPT.font; } fit(); saveOpts(); }
   if (k === "=" || k === "+") { if (OPT.style === "pixel") OPT.pxs = Math.min(10, OPT.pxs + 1); else { OPT.font = Math.min(18, OPT.font + 1); FONT = OPT.font; } fit(); saveOpts(); }
@@ -3108,9 +3146,16 @@ addEventListener("keydown", e => {
   if (k === "t") cyclePawnCmd();
   if (k === "f") { const s = $("scan"); s.style.display = s.style.display === "block" ? "none" : "block"; }
 });
-addEventListener("keyup", e => { const k = e.key.toLowerCase(); keys[k] = false; if (k === "j") attackUp(); });
+addEventListener("keyup", e => { const k = keyOf(e); keys[k] = false; if (k === "j") attackUp(); });
 addEventListener("blur", () => { keys = {}; mouseR = false; if (P.charging) { P.charging = false; P.chargeT = 0; } });
-overlay.addEventListener("click", e => { const b = e.target && e.target.closest ? e.target.closest("button,input,label,select") : null; if (!b) play(); });
+overlay.addEventListener("click", e => {
+  if (Date.now() < suppressClickUntil) return;            // click sintetizado tras abrir el menú
+  const b = e.target && e.target.closest ? e.target.closest("button,input,label,select") : null;
+  // #opts y #help son divs: antes, pulsar el texto de ayuda o el relleno de las
+  // opciones arrancaba la partida mientras el jugador intentaba leer.
+  if (!b && e.target && e.target.closest && e.target.closest("#opts,#help,#ovmsg,#menu")) return;
+  play();
+});
 screen.addEventListener("mousedown", e => {
   if (menuOpen) return;
   if (e.button === 2) { mouseR = true; return; }
