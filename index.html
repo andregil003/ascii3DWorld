@@ -2707,11 +2707,46 @@ function saveGame(manual) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); } catch (e) { return false; }
   P.saveT = 0; if (manual) note("Partida guardada"); return true;
 }
+// Valida un save crudo ANTES de tocar el estado global. Un save corrupto, viejo o
+// editado a mano debe devolver false (y borrar el save), no lanzar a mitad del arranque.
+function validSave(sv) {
+  if (!sv || sv.v !== 2 || typeof sv !== "object") return "version";
+  const num = (v, lo, hi) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
+  if (!num(sv.seed, 0, 1e9)) return "seed";
+  if (!num(sv.x, -1e6, 1e6) || !num(sv.y, -1e6, 1e6) || !num(sv.a, -1e7, 1e7)) return "pos";
+  if (!num(sv.hp, 0, 9999) || !num(sv.max, 1, 9999)) return "hp";
+  if (!num(sv.sta, 0, 1e6) || !num(sv.staMax, 1, 1e6)) return "sta";
+  if (!num(sv.dayT, -1e6, 1e6)) return "dayT";
+  if (!num(sv.snowG, 0, 1)) return "snowG";
+  if (!Number.isInteger(sv.kills) || sv.kills < 0 || sv.kills > 1e7) return "kills";
+  if (!Number.isInteger(sv.wpn) || sv.wpn < 1 || sv.wpn > 99) return "wpn";
+  if (typeof sv.weather !== "string" || !WPRE[sv.weather]) return "weather";
+  if (!sv.lvl || typeof sv.lvl !== "object" || typeof sv.lvl.t !== "string") return "lvl";
+  if (!["over", "cave", "tower", "mine", "house"].includes(sv.lvl.t)) return "lvl.t";
+  if (sv.lvl.t === "mine" && !Number.isInteger(sv.lvl.i)) return "lvl.i";
+  if (sv.lvl.t === "house" && !Number.isInteger(sv.lvl.id)) return "lvl.id";
+  if (sv.inv && typeof sv.inv !== "object") return "inv";
+  if (sv.qs && typeof sv.qs !== "object") return "qs";
+  if (sv.pawns && !Array.isArray(sv.pawns)) return "pawns";
+  if (sv.st && !Array.isArray(sv.st)) return "st";
+  if (sv.boat && typeof sv.boat !== "object") return "boat";
+  return null;
+}
 function loadGame() {
   let sv; try { sv = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
-  if (!sv || sv.v !== 2) return false;
+  const bad = validSave(sv);
+  if (bad) { try { localStorage.removeItem(SAVE_KEY); } catch (e2) {} return false; }
   let w = null; try { w = genOverworld(sv.seed); } catch (e) { w = null; }
   if (!w) return false;
+  // Resolucion defensiva del nivel: nunca indexar sin comprobar.
+  const t = sv.lvl;
+  let lvl = null;
+  if (t.t === "over") lvl = w;
+  else if (t.t === "cave") lvl = w.caveLevel || null;
+  else if (t.t === "tower") lvl = w.towerLevel || null;
+  else if (t.t === "mine") lvl = (w.mines && w.mines[t.i]) || null;
+  else if (t.t === "house") lvl = (w.houses && w.houses[t.id] && w.houses[t.id].level) || null;
+  if (!lvl) { try { localStorage.removeItem(SAVE_KEY); } catch (e2) {} return false; }
   WORLD = w; SEED = sv.seed; resetPlayer();
   const lvls = allLevels(w);
   (sv.st || []).forEach((s, i) => {
@@ -2721,12 +2756,16 @@ function loadGame() {
     (s.ch || []).forEach((o, j) => { if (o && l.chests[j]) l.chests[j].open = true; });
   });
   Object.assign(P, { hp: sv.hp, max: sv.max, sta: sv.sta, staMax: sv.staMax || 100, sword: sv.sword, shield: sv.shield, bow: sv.bow, staff: !!sv.staff, wpn: sv.wpn, kills: sv.kills || 0 });
-  Object.assign(INV, sv.inv); for (const k in QS) delete QS[k]; Object.assign(QS, sv.qs || {});
-  dayT = sv.dayT; autoDay = sv.autoDay; setWeather(sv.weather); Object.assign(W, WPRE[sv.weather] || WPRE.clear); W.snowG = sv.snowG || 0;
-  const t = sv.lvl, lvl = t.t === "over" ? w : t.t === "cave" ? w.caveLevel : t.t === "tower" ? w.towerLevel : t.t === "mine" ? w.mines[t.i] : w.houses[t.id].level;
+  for (const k in INV) if (!sv.inv || typeof sv.inv[k] !== "number" || !Number.isFinite(sv.inv[k])) delete INV[k];
+  if (sv.inv) for (const k in sv.inv) if (typeof sv.inv[k] === "number" && Number.isFinite(sv.inv[k])) INV[k] = sv.inv[k];
+  for (const k in QS) delete QS[k]; if (sv.qs) for (const k in sv.qs) if (typeof sv.qs[k] === "string") QS[k] = sv.qs[k];
+  dayT = sv.dayT; autoDay = !!sv.autoDay; setWeather(sv.weather); Object.assign(W, WPRE[sv.weather] || WPRE.clear); W.snowG = sv.snowG || 0;
   setLevel(lvl);
   if (sv.boat && w.boat) { w.boat.x = sv.boat.x; w.boat.y = sv.boat.y; }
   px = sv.x; py = sv.y; ang = sv.a; pitch = 0;
+  // Red de seguridad: si la posicion guardada cae en terreno solido (por un cambio
+  // de seed/version), arrancar en el spawn en vez de quedar atascado sin salida.
+  if (WORLD && blockedFor(px, py, null, 0.2)) { px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; }
   if (sv.onBoat && lvl === w && w.boat) { P.boat = w.boat; w.boat.hidden = true; }
   restorePawns(sv.pawns);
   drawHearts(); drawInv(); drawQuests();
@@ -3028,10 +3067,19 @@ function updateMarkers() {
 let WORLD = null, last = 0, frames = 0, ftime = 0, mouseR = false;
 const fpsEl = $("fps"), posEl = $("pos"), overlay = $("overlay"), promptEl = $("prompt");
 function newWorld(seed) {
+  // BUG FIX: el for original hacia s++ tambien tras la iteracion exitosa, dejando
+  // SEED = seed+1 mientras el mundo se generaba con seed. Al guardar y cargar se
+  // regeneraba un mundo DISTINTO y el jugador aparecia dentro de terreno solido
+  // (montana/agua, ambos SOLID) -> atascado sin salida.
   let w = null, s = seed;
-  for (let i = 0; i < 25 && !w; i++, s++) w = genOverworld(s);
+  for (let i = 0; i < 25 && !w; i++) {
+    try { w = genOverworld(s); } catch (e) { w = null; }
+    if (!w) s++;            // solo avanza si este seed fallo
+  }
+  if (!w) { w = genOverworld(seed); s = seed; }
   WORLD = w; SEED = s; setLevel(WORLD); resetPlayer();
   px = WORLD.spawn.x; py = WORLD.spawn.y; ang = WORLD.spawn.ang; pitch = 0; drawHearts(); drawInv();
+  return true;
 }
 
 // ============================================================
@@ -3084,10 +3132,21 @@ setTimeout(() => { $("toast").style.opacity = 0; }, 8000);
 const QS_ = (typeof location !== "undefined" && location.search) || "", mSeed = /seed=(\d+)/.exec(QS_);
 applyOpts(); bindMenu();
 let loaded = false;
-if (mSeed) newWorld(parseInt(mSeed[1])); else { loaded = loadGame(); if (!loaded) newWorld(Math.floor(Math.random() * 99999) + 1); }
+// Cinturon de seguridad: si algo inesperado lanza durante el arranque, se descarta el
+// save, se genera un mundo limpio y se muestra el aviso. Antes un TypeError aqui
+// abortaba todo el script: sin fit(), sin menu, sin rAF -> pantalla negra sin salida.
+try {
+  if (mSeed) newWorld(parseInt(mSeed[1], 10));
+  else { loaded = loadGame(); if (!loaded) newWorld(Math.floor(Math.random() * 99999) + 1); }
+} catch (err) {
+  loaded = false;
+  try { localStorage.removeItem(SAVE_KEY); } catch (e2) {}
+  try { newWorld(Math.floor(Math.random() * 99999) + 1); } catch (e3) {}
+  var bootErr = true;
+}
 if (isTouch()) buildTouch();
 fit(); setTimeout(fit, 60);
-showMenu(loaded ? "Partida cargada" : "");
+showMenu(loaded ? "Partida cargada" : (typeof bootErr !== "undefined" && bootErr) ? "Partida guardada dañada: se empezó una nueva" : "");
 requestAnimationFrame(t => { last = t; loop(t); });
 </script>
 </body>
